@@ -68,7 +68,7 @@ class JsonFactory(val universe: Universe) {
     def createTypeEntity(t: TypeEntity): JObject = {
       val j = new JObject
       j += "name" -> t.name
-      j += "refEntity" -> JObject(t.refEntity.map { case (k,v) => k -> JArray(Seq(global(v._1)(createEntity _), v._2)) })
+      j += "refEntity" -> JObject(t.refEntity.map { case (k,v) => k.toString -> JArray(Seq(global(v._1)(createEntity _), v._2)) })
       j
     }
 
@@ -168,8 +168,7 @@ class JsonFactory(val universe: Universe) {
         globalEntityOrdinals += RefId(e) -> ord
         val o = f(e)
         if(outFirst) outFirst = false else out println ','
-        out print ord
-        out print ':'
+        out print "\"" + ord + "\":"
         o.write(out)
         ord
     }
@@ -195,5 +194,5 @@ abstract class HtmlGen extends html.HtmlPage {
 
   def mkString(ns: NodeSeq) = Xhtml.toXhtml(ns)
 
-  override def relativeLinkTo(destClass: TemplateEntity): String = "##" + ref(destClass)
+  override def relativeLinkTo(destClass: TemplateEntity): String = "#" + ref(destClass)
 }

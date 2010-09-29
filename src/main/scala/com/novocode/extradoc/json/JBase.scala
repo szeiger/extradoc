@@ -15,12 +15,6 @@ object CanBeValue {
   implicit val booleanCanBeValue = new CanBeValue[Boolean] { def isEmpty(v: Boolean) = v == false }
 }
 
-final class CanBeKey[-T]
-object CanBeKey {
-  implicit val intCanBeKey = new CanBeKey[Int]
-  implicit val stringCanBeKey = new CanBeKey[String]
-}
-
 abstract class JBase {
   def write(out: PrintStream): Unit
   def isEmpty: Boolean
@@ -37,12 +31,12 @@ abstract class JBase {
 }
 
 final class JObject extends JBase {
-  private[this] val m = new mutable.HashMap[Any, Any]
-  def += [K, V](t: (K, V))(implicit ck: CanBeKey[K], cv: CanBeValue[V]) {
+  private[this] val m = new mutable.HashMap[String, Any]
+  def += [V](t: (String, V))(implicit cv: CanBeValue[V]) {
     if(m contains t._1) throw new RuntimeException("Cannot overwrite field "+t._1)
     m += t
   }
-  def +?= [K, V](t: (K, V))(implicit ck: CanBeKey[K], cv: CanBeValue[V]) =
+  def +?= [V](t: (String, V))(implicit cv: CanBeValue[V]) =
     if(!cv.isEmpty(t._2)) this += t
   def isEmpty = m.isEmpty
   def write(out: PrintStream) {
@@ -50,10 +44,7 @@ final class JObject extends JBase {
     var first = true
     for((k,v) <- m) {
       if(first) first = false else out.print(',')
-      k match {
-        case s: String => out.print(quote(s))
-        case o => out.print(o)
-      }
+      out.print(quote(k))
       out.print(':')
       v match {
         case j: JBase => j.write(out)
@@ -67,7 +58,7 @@ final class JObject extends JBase {
 
 object JObject {
   def apply: JObject = new JObject
-  def apply[K : CanBeKey, V : CanBeValue](t: Traversable[(K,V)]): JObject = {
+  def apply[V : CanBeValue](t: Traversable[(String,V)]): JObject = {
     val o = new JObject
     t foreach { case (k,v) => o += k -> v }
     o
