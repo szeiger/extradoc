@@ -13,17 +13,17 @@ case class JsonWriter(dir: String, fname: String) {
   private[this] var first = true
 
   object ObjectWriter {
-    def write(k: String, v: JBase) {
+    def write(k: String, v: JBase, resolveLink: Link => Any) {
       if(first) first = false else bwr write ",\n"
       bwr write "\""+k+"\":"
-      v writeTo bwr
+      v.writeTo(bwr, resolveLink)
     }
   }
 
   object ArrayWriter {
-    def write(v: JBase) {
+    def write(v: JBase, resolveLink: Link => Any) {
       if(first) first = false else bwr write ",\n"
-      v writeTo bwr
+      v.writeTo(bwr, resolveLink)
     }
   }
 

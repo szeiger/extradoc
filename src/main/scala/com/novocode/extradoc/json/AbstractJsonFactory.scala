@@ -13,12 +13,11 @@ abstract class AbstractJsonFactory {
     println("Building JSON model")
     val (allModels, allModelsReverse) = buildModels(universe)
     while(allModels.size > allModelsReverse.size) compact(allModels, allModelsReverse)
+    inline(allModels, allModelsReverse)
     if(allModels.keys.max + 1 != allModels.size) renumber(allModels, allModelsReverse)
     if(allModels.keys.max + 1 != allModels.size)
       throw new RuntimeException("Renumbering failed: Max key "+allModels.keys.max+" for size "+allModels.size)
-    println("Verifying JSON model")
-    val (verOk, linkCount) = verify(allModels)
-    println("Verified "+linkCount+" links")
+    val (verOk, _) = verify(allModels)
     if(!verOk) throw new RuntimeException("Model verification failed")
     (allModels, allModelsReverse)
   }
@@ -59,6 +58,7 @@ abstract class AbstractJsonFactory {
   }
 
   def verify(m: mutable.HashMap[Int, JBase]): (Boolean, Int) = {
+    println("Verifying JSON model")
     var ok = true
     var count = 0
     val verified = new mutable.HashSet[Int]
@@ -79,6 +79,7 @@ abstract class AbstractJsonFactory {
       }
     }
     for((ord, j) <- m) f(ord, j)
+    println("Verified "+count+" links and "+m.size+" global objects")
     (ok, count)
   }
 
@@ -111,5 +112,52 @@ abstract class AbstractJsonFactory {
     allModels ++= newM
     allModelsReverse.clear
     for((ord, j) <- allModels) allModelsReverse += j -> ord
+  }
+
+  def findGlobal(allModels: mutable.HashMap[Int, JBase]) = {
+    val global = new mutable.HashSet[Int]
+    def f(ord: Int) {
+      if(!(global contains ord)) {
+        global += ord
+        allModels(ord) match {
+          case j: JObject =>
+            j("templates") foreach { o =>
+              o.asInstanceOf[JArray].values foreach { v =>
+                f(v.asInstanceOf[Link].target)
+              }
+            }
+          case _ =>
+        }
+      }
+    }
+    f(0)
+    global
+  }
+
+  def inline(allModels: mutable.HashMap[Int, JBase], allModelsReverse: mutable.HashMap[JBase, Int]) {
+    println("Finding objects to inline")
+    val keepGlobal = findGlobal(allModels)
+    println("Protecting "+keepGlobal.size+" objects")
+    val counts = new mutable.HashMap[Int, Int]
+    allModels.values foreach {
+      _ foreachRec {
+        _.links foreach { l =>
+          counts += l.target -> (counts.getOrElse(l.target, 0) + 1)
+        }
+      }
+    }
+    val toInline = (counts filter { case (_,c) => c <= 1 } keys).toSet -- keepGlobal
+    if(!toInline.isEmpty) {
+      println("Inlining/eliminating "+toInline.size+" objects")
+      val repl = toInline map { i => (Link(i), allModels(i)) } toMap;
+      allModels --= toInline
+      def replaceIn(j: JBase) {
+        j replaceLinks repl
+        j.children map { replaceIn _ }
+      }
+      allModels.values foreach { replaceIn _ }
+      allModelsReverse.clear
+      for((ord, j) <- allModels) allModelsReverse += j -> ord
+    }
   }
 }

@@ -50,7 +50,6 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
   def document(files: List[String]): Unit = {
     (new compiler.Run()) compile files
     compiler.addSourceless
-    assert(settings.docformat.value == "html" || settings.docformat.value == "json")
     if (!reporter.hasErrors) {
       val modelFactory = (new model.ModelFactory(compiler, settings) with model.comment.CommentFactory)
       val docModel = modelFactory.makeModel
@@ -58,7 +57,8 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
       settings.docformat.value match {
         case "html" => (new html.HtmlFactory(docModel)) generate docModel
         case "json" => (new json.JsonFactory(docModel)) generate docModel
-	  }
+        case "json-multi" => (new json.JsonMultiFactory(docModel)) generate docModel
+	    }
     }
   }
   
