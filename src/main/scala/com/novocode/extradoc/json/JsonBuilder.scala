@@ -134,7 +134,8 @@ abstract class JsonBuilder[Link : CanBeValue] {
       j +?= "parentTemplates" -> JArray(t.parentTemplates.map(e => global(e)(createEntity _)))
       j +?= "linearization" -> JArray(t.linearization.map(e => global(e)(createEntity _)))
       j +?= "subClasses" -> JArray(t.subClasses.map(e => global(e)(createEntity _)))
-      j +?= "members" -> JArray(t.members.map(e => global(e)(createEntity _)))
+      // "members" is constructors + templates + methods + values + abstractTypes + aliasTypes + packages
+      //j +?= "members" -> JArray(t.members.map(e => global(e)(createEntity _)))
       j +?= "templates" -> JArray(t.templates.map(e => global(e)(createEntity _)))
       j +?= "methods" -> JArray(t.methods.map(e => global(e)(createEntity _)))
       j +?= "values" -> JArray(t.values.map(e => global(e)(createEntity _)))

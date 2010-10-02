@@ -9,11 +9,13 @@ import scala.collection._
 
 abstract class AbstractJsonFactory {
 
+  val doInline = true
+
   def prepareModel(universe: Universe) = {
     println("Building JSON model")
     val (allModels, allModelsReverse) = buildModels(universe)
     while(allModels.size > allModelsReverse.size) compact(allModels, allModelsReverse)
-    inline(allModels, allModelsReverse)
+    if(doInline) inline(allModels, allModelsReverse)
     if(allModels.keys.max + 1 != allModels.size) renumber(allModels, allModelsReverse)
     if(allModels.keys.max + 1 != allModels.size)
       throw new RuntimeException("Renumbering failed: Max key "+allModels.keys.max+" for size "+allModels.size)

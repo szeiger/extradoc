@@ -9,6 +9,10 @@ import scala.collection._
 
 class JsonMultiFactory(val universe: Universe) extends AbstractJsonFactory {
 
+  // Global inlining is harmful for multi-page output because it increases
+  // the size of extra objects which are included in many pages
+  override val doInline = false
+
   case class Page(no: Int, main: Int) {
     val objects = new mutable.HashSet[Int]
     val renumbered = new mutable.ArrayBuffer[Int]
