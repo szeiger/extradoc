@@ -49,12 +49,26 @@ class JsonMultiFactory(val universe: Universe) extends AbstractJsonFactory {
     }
     println("Total number of extra objects on all pages: "+extraTotal)
     println("Inlining extras on all pages")
+    val keepHtmlLinks = new mutable.HashSet[Int]
+    allModels.values foreach {
+      _ foreachRec {
+        _ match {
+          case j: JObject =>
+            j("_links") foreach {
+              _.asInstanceOf[JArray].values foreach {
+                keepHtmlLinks += _.asInstanceOf[Link].target
+              }
+            }
+          case _ =>
+        }
+      }
+    }
     var totalInlined = 0
     val counts = new mutable.HashMap[Int, Int]
     allModels.values foreach {
       _ foreachRec {
         _.links foreach { l =>
-          if(extra contains l.target)
+          if((extra contains l.target) && !(keepHtmlLinks contains l.target))
             counts += l.target -> (counts.getOrElse(l.target, 0) + 1)
         }
       }

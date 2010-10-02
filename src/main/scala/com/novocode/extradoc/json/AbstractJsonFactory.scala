@@ -136,8 +136,21 @@ abstract class AbstractJsonFactory {
 
   def inline(allModels: mutable.HashMap[Int, JBase], allModelsReverse: mutable.HashMap[JBase, Int]) {
     println("Finding objects to inline")
-    val keepGlobal = findGlobal(allModels)
-    println("Protecting "+keepGlobal.size+" objects")
+    val keep = findGlobal(allModels)
+    allModels.values foreach {
+      _ foreachRec {
+        _ match {
+          case j: JObject =>
+            j("_links") foreach {
+              _.asInstanceOf[JArray].values foreach {
+                keep += _.asInstanceOf[Link].target
+              }
+            }
+          case _ =>
+        }
+      }
+    }
+    println("Protecting "+keep.size+" objects")
     val counts = new mutable.HashMap[Int, Int]
     allModels.values foreach {
       _ foreachRec {
@@ -146,7 +159,7 @@ abstract class AbstractJsonFactory {
         }
       }
     }
-    val toInline = (counts filter { case (_,c) => c <= 1 } keys).toSet -- keepGlobal
+    val toInline = (counts filter { case (_,c) => c <= 1 } keys).toSet -- keep
     if(!toInline.isEmpty) {
       println("Inlining/eliminating "+toInline.size+" objects")
       val repl = toInline map { i => (Link(i), allModels(i)) } toMap;

@@ -14,8 +14,12 @@ abstract class JsonBuilder[Link : CanBeValue] {
   def as[T](o: AnyRef)(f: T => Unit)(implicit m: ClassManifest[T]): Unit =
     if(m.erasure.isInstance(o)) f(o.asInstanceOf[T])
 
-  val htmlGen = new HtmlGen {
-    def ref(e: TemplateEntity) = global(e)(createEntity _).toString
+  class CollectingHtmlGen extends HtmlGen {
+    val links = new JArray
+    def ref(e: TemplateEntity) = {
+      links += global(e)(createEntity _)
+      "#"
+    }
   }
 
   def createVisibility(v: Visibility): JObject = {
@@ -35,11 +39,20 @@ abstract class JsonBuilder[Link : CanBeValue] {
     j
   }
 
-  def createBody(b: Body): String = htmlGen.mkString(htmlGen.bodyToHtml(b))
+  def createHtml(f: HtmlGen => NodeSeq) = {
+    val gen = new CollectingHtmlGen
+    val ns = f(gen)
+    val j = new JObject
+    j +?= "_links" -> gen.links
+    j += "_html" -> gen.mkString(ns)
+    j
+  }
 
-  def createBlock(b: Block): String = htmlGen.mkString(htmlGen.blockToHtml(b))
+  def createBody(b: Body) = createHtml(_.bodyToHtml(b))
 
-  def createInline(i: Inline): String = htmlGen.mkString(htmlGen.inlineToHtml(i))
+  def createBlock(b: Block) = createHtml(_.blockToHtml(b))
+
+  def createInline(i: Inline) = createHtml(_.inlineToHtml(i))
 
   def createComment(c: Comment): JObject = {
     val j = new JObject
@@ -80,8 +93,8 @@ abstract class JsonBuilder[Link : CanBeValue] {
     //j += "toRoot" -> JArray(e.toRoot.map(e => global(e)(createEntity _)))
     val qName = e.qualifiedName
     var name = e.name
-    val sep1 = qName.lastIndexOf('.')
-    val sep2 = qName.lastIndexOf('#')
+    val sep1 = qName.lastIndexOf('#')
+    val sep2 = qName.lastIndexOf('.')
     val sep = if(sep1 > sep2) sep1 else sep2
     if(sep > 0 && qName.substring(sep+1) == name || sep == -1 && qName == name) name = null
     j += "qName" -> e.qualifiedName
@@ -133,7 +146,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
       j +?= "valueParams" -> JArray(t.valueParams.map(l => JArray(l.map(e => global(e)(createEntity _)))))
     }
     as[Class](e) { c =>
-      c.primaryConstructor foreach { c => global(c)(createEntity _) }
+      c.primaryConstructor foreach { c => j += "primaryConstructor" -> global(c)(createEntity _) }
       j +?= "constructors" -> JArray(c.constructors.map(e => global(e)(createEntity _)))
       if(c.isCaseClass) j += "isCaseClass" -> true
     }
