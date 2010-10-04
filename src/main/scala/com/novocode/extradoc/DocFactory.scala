@@ -58,6 +58,7 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
         case "html" => (new html.HtmlFactory(docModel)) generate docModel
         case "json" => (new json.JsonFactory(docModel)) generate docModel
         case "json-multi" => (new json.JsonMultiFactory(docModel)) generate docModel
+        case "explorer" => (new json.JsonMultiFactory(docModel, explorer = true)) generate docModel
 	    }
     }
   }

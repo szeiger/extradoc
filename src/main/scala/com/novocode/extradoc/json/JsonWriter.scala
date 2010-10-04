@@ -7,7 +7,7 @@ import comment._
 import java.io.{FileOutputStream, OutputStreamWriter, BufferedWriter, File => JFile}
 import scala.collection._
 
-case class JsonWriter(dir: String, fname: String) {
+case class JsonWriter(dir: JFile, fname: String) {
 
   private[this] var bwr: BufferedWriter = null
   private[this] var first = true
@@ -28,7 +28,7 @@ case class JsonWriter(dir: String, fname: String) {
   }
 
   def createObject(f: ObjectWriter.type => Unit) {
-    val fOut = new FileOutputStream(new JFile(new JFile(dir), fname))
+    val fOut = new FileOutputStream(new JFile(dir, fname))
     try {
       bwr = new BufferedWriter(new OutputStreamWriter(fOut, "ISO-8859-1"), 1024*1024)
       bwr write '{'
@@ -39,7 +39,7 @@ case class JsonWriter(dir: String, fname: String) {
   }
 
   def createArray(f: ArrayWriter.type => Unit) {
-    val fOut = new FileOutputStream(new JFile(new JFile(dir), fname))
+    val fOut = new FileOutputStream(new JFile(dir, fname))
     try {
       bwr = new BufferedWriter(new OutputStreamWriter(fOut, "ISO-8859-1"), 1024*1024)
       bwr write '['

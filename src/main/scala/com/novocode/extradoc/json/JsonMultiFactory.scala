@@ -7,13 +7,14 @@ import comment._
 import java.io.{PrintStream, FileOutputStream, BufferedOutputStream, StringWriter, File => JFile}
 import scala.collection._
 
-class JsonMultiFactory(val universe: Universe) extends AbstractJsonFactory {
+class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends AbstractJsonFactory(universe) {
 
   // Global inlining is harmful for multi-page output because it increases
   // the size of extra objects which are included in many pages
   override val doInline = false
 
   override val typeEntitiesAsHtml = true
+  override val compactFlags = true
 
   case class Page(no: Int, main: Int) {
     val objects = new mutable.HashSet[Int]
@@ -21,13 +22,22 @@ class JsonMultiFactory(val universe: Universe) extends AbstractJsonFactory {
   }
 
   def generate(universe: Universe): Unit = {
+    if(explorer) {
+      val p = "/com/novocode/extradoc/explorer"
+      copyResource(p, "index.html")
+      copyResource(p, "extradoc.js")
+      copyResource(p, "extradoc.css")
+      copyResource(p, "jquery.js")
+      copyResource(p, "jquery.history.js")
+    }
+
     val (allModels, _) = prepareModel(universe)
     val pages = findGlobal(allModels).toSeq.sorted.
       zipWithIndex map { case (ord,idx) => (ord, Page(idx, ord))} toMap;
     def findPage(ord: Int, j: JBase): Option[Page] = j match {
       case j: JObject =>
         // Don't map external packages to their parents
-        if(ord >= 0 && j("isPackage").getOrElse(false) == true && !(pages contains ord)) None
+        if(ord >= 0 && (j("isPackage").getOrElse(false) == true || j("is").getOrElse("").asInstanceOf[String].contains('p')) && !(pages contains ord)) None
         else j("inTemplate") match {
           case Some(Link(target)) =>
             pages get target orElse (allModels get target flatMap (ch => findPage(target, ch)))
@@ -110,7 +120,7 @@ class JsonMultiFactory(val universe: Universe) extends AbstractJsonFactory {
     println("Writing p0.json to p"+(pages.size-1)+".json")
     for(p <- pages.values) {
       val renumberedMap = p.renumbered.zipWithIndex.toMap
-      JsonWriter(universe.settings.outdir.value, "p"+p.no+".json") createArray { w =>
+      JsonWriter(siteRoot, "p"+p.no+".json") createArray { w =>
         for(ord <- p.renumbered) {
           w.write(allModels(ord), { l: Link =>
             renumberedMap get l.target getOrElse {

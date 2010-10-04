@@ -5,12 +5,14 @@ import model._
 import comment._
 
 import java.io.{PrintStream, FileOutputStream, BufferedOutputStream, StringWriter, File => JFile}
+import scala.tools.nsc.io.{ Streamable, Directory }
 import scala.collection._
 
-abstract class AbstractJsonFactory { self =>
+abstract class AbstractJsonFactory(val universe: Universe) { self =>
 
   val doInline = true
   val typeEntitiesAsHtml = false
+  val compactFlags = false
 
   def prepareModel(universe: Universe) = {
     println("Building JSON model")
@@ -31,6 +33,7 @@ abstract class AbstractJsonFactory { self =>
     val allModelsReverse = new mutable.HashMap[JBase, Int]
     val builder = new JsonBuilder[Link] {
       val typeEntitiesAsHtml = self.typeEntitiesAsHtml
+      val compactFlags = self.compactFlags
       def global[T <: Entity](e: T)(f: T => JBase) = globalEntityOrdinals.get(EntityHash(e)) match {
         case Some(ord) => Link(ord)
         case None =>
@@ -176,5 +179,19 @@ abstract class AbstractJsonFactory { self =>
       allModelsReverse.clear
       for((ord, j) <- allModels) allModelsReverse += j -> ord
     }
+  }
+
+  lazy val siteRoot: JFile = new JFile(universe.settings.outdir.value)
+
+  def copyResource(resPath: String, subPath: String) {
+    val bytes = new Streamable.Bytes {
+      val inputStream = getClass.getResourceAsStream(resPath + "/" + subPath)
+      assert(inputStream != null)
+    }.toByteArray
+    val dest = Directory(siteRoot) / subPath
+    dest.parent.createDirectory()
+    val out = dest.toFile.bufferedOutput()
+    try out.write(bytes, 0, bytes.length)
+    finally out.close()
   }
 }

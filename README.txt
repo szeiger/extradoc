@@ -9,6 +9,9 @@ the command line syntax) of the original Scaladoc, plus:
 - Generate documentation in multiple JSON files, one per doc template like
   in scaladoc's HTML output (-doc-format:json-multi)
 
+- Generate documentation in multiple JSON files plus the browser-based
+  Extradoc Explorer (-doc-format:explorer)
+
 - Instead of only Scala source files you can also specify directories on the
   command line to include all *.scala files inside (recursively)
 

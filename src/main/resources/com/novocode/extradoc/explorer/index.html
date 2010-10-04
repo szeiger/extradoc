@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html><head>
+  <title>Extradoc Explorer</title>
+  <link href="extradoc.css" media="screen" rel="Stylesheet" type="text/css"/>
+  <script type="text/javascript" src="jquery.js"></script>
+  <script type="text/javascript" src="jquery.history.js"></script>
+  <script type="text/javascript" src="extradoc.js"></script>
+</head><body>
+
+<h1>Extradoc Explorer</h1>
+
+<div id="content"></div>
+
+<script type="text/javascript">
+$(function(){
+
+  extradoc.onEntityLink = function(page, entity) {
+    $.history.load("e/"+page+"/"+entity);
+  };
+
+  function loadPage(no, entity) {
+    $("#content").empty().append("Loading page "+no+"...");
+    $(window).scrollTop(0);
+    setTimeout(function() {
+      extradoc.log("Loading data...");
+      var t0 = (new Date).getTime();
+      extradoc.load(no, function(page) {
+          extradoc.log("Loaded and prepared page with "+page.length+" entities in "+((new Date).getTime()-t0)+"ms");
+          t0 = (new Date).getTime();
+          $("#content").empty().append(extradoc.createPageDOM(page));
+          extradoc.log("Rendered in "+((new Date).getTime()-t0)+"ms");
+          extradoc.scrollToEntity(entity);
+        }, function(XMLHttpRequest, textStatus, errorThrown) {
+          var errmsg = "Error loading page: "+textStatus+"; "+errorThrown;
+          extradoc.log(errmsg);
+          $("#content").empty().append(errmsg);
+        });
+    }, 0);
+  }
+
+  function showPage(page, entity) {
+    extradoc.log("Showing page "+page+", entity "+entity);
+    if(extradoc.currentPage && page == extradoc.currentPage._no)
+      extradoc.scrollToEntity(entity);
+    else loadPage(page, entity);
+  }
+
+  $.history.init(function(hash) {
+    var res;
+    if(hash == "") showPage(0, -1);
+    else if(res = hash.match(/^e\/(.*)\/(.*)$/)) showPage(parseInt(res[1]), parseInt(res[2]));
+  }, { unescape: "/" });
+});
+</script>
+<noscript>Please enable JavaScript. This is a browser app which will not work at all
+without it.</noscript>
+
+</body></html>

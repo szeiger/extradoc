@@ -10,6 +10,7 @@ import scala.xml.{Xhtml, NodeSeq, NodeBuffer, Text, Elem}
 abstract class JsonBuilder[Link : CanBeValue] {
 
   val typeEntitiesAsHtml: Boolean
+  val compactFlags: Boolean
 
   def global[T <: Entity](e: T)(f: T => JBase): Link
 
@@ -26,16 +27,18 @@ abstract class JsonBuilder[Link : CanBeValue] {
 
   def createVisibility(v: Visibility): JObject = {
     val j = new JObject
-    if(v.isProtected) j += "isProtected" -> true
-    if(v.isPublic) j += "isPublic" -> true
-    if(v.isInstanceOf[PrivateInInstance]) j += "isPrivateInInstance" -> true
-    if(v.isInstanceOf[ProtectedInInstance]) j += "isProtectedInInstance" -> true
+    if(!compactFlags) {
+      if(v.isProtected) j += "isProtected" -> true
+      if(v.isPublic) j += "isPublic" -> true
+      if(v.isInstanceOf[PrivateInInstance]) j += "isPrivateInInstance" -> true
+      if(v.isInstanceOf[ProtectedInInstance]) j += "isProtectedInInstance" -> true
+    }
     as[PrivateInTemplate](v) { p =>
-      j += "isPrivateInTemplate" -> true
+      if(!compactFlags) j += "isPrivateInTemplate" -> true
       j += "owner" -> global(p.owner)(createEntity _)
     }
     as[ProtectedInTemplate](v) { p =>
-      j += "isProtectedInTemplate" -> true
+      if(!compactFlags) j += "isProtectedInTemplate" -> true
       j += "owner" -> global(p.owner)(createEntity _)
     }
     j
@@ -120,32 +123,71 @@ abstract class JsonBuilder[Link : CanBeValue] {
     j += "qName" -> e.qualifiedName
     if(name ne null) j += "name" -> e.name
     as[TemplateEntity](e) { t =>
-      if(t.isPackage) j += "isPackage" -> true
-      if(t.isRootPackage) j += "isRootPackage" -> true
-      if(t.isTrait) j += "isTrait" -> true
-      if(t.isClass) j += "isClass" -> true
-      if(t.isObject) j += "isObject" -> true
-      if(t.isDocTemplate) j += "isDocTemplate" -> true
+      if(compactFlags) {
+        if(t.isPackage) set(j, 'p')
+        if(t.isRootPackage) set(j, 'r')
+        if(t.isTrait) set(j, 't')
+        if(t.isClass) set(j, 'c')
+        if(t.isObject) set(j, 'b')
+        if(t.isDocTemplate) set(j, 'D')
+      } else {
+        if(t.isPackage) j += "isPackage" -> true
+        if(t.isRootPackage) j += "isRootPackage" -> true
+        if(t.isTrait) j += "isTrait" -> true
+        if(t.isClass) j += "isClass" -> true
+        if(t.isObject) j += "isObject" -> true
+        if(t.isDocTemplate) j += "isDocTemplate" -> true
+      }
     }
     //as[NoDocTemplate](e) { t => j += "isNoDocTemplate" -> true }
     as[MemberEntity](e) { m =>
       m.comment foreach { c => j += "comment" -> createComment(c) }
       j += "inDefinitionTemplates" -> JArray(m.inDefinitionTemplates.map(e => global(e)(createEntity _)))
       j +?= "definitionName" -> m.definitionName
-      j += "visibility" -> createVisibility(m.visibility)
-      j +?= "flags" -> JArray(m.flags.map(createBlock _))
+      if(compactFlags) {
+        if(m.visibility.isProtected) set(j, 'o')
+        if(m.visibility.isPublic) set(j, 'u')
+        if(m.visibility.isInstanceOf[PrivateInInstance]) set(j, 'i')
+        if(m.visibility.isInstanceOf[ProtectedInInstance]) set(j, 'O')
+        if(m.visibility.isInstanceOf[PrivateInTemplate]) set(j, 'e')
+        if(m.visibility.isInstanceOf[ProtectedInTemplate]) set(j, 'E')
+      }
+      j +?= "visibility" -> createVisibility(m.visibility)
+      m.flags.map(createBlock _) foreach { fj =>
+        fj("_html") match {
+          case Some("<p>sealed</p>") =>
+            if(compactFlags) set(j, 's') else j += "isSealed" -> true
+          case Some("<p>abstract</p>") =>
+            if(compactFlags) set(j, 'B') else j += "isAbstract" -> true
+          case Some("<p>final</p>") =>
+            if(compactFlags) set(j, 'f') else j += "isFinal" -> true
+          case _ =>
+        }
+      }
       m.deprecation foreach { d => j += "deprecation" -> createBody(d) }
       j +?= "inheritedFrom" -> JArray(m.inheritedFrom.map(e => global(e)(createEntity _)))
       j += "resultType" -> createTypeEntity(m.resultType)
-      if(m.isDef) j += "isDef" -> true
-      if(m.isVal) j += "isVal" -> true
-      if(m.isLazyVal) j += "isLazyVal" -> true
-      if(m.isVar) j += "isVar" -> true
-      if(m.isImplicit) j += "isImplicit" -> true
-      if(m.isConstructor) j += "isConstructor" -> true
-      if(m.isAliasType) j += "isAliasType" -> true
-      if(m.isAbstractType) j += "isAbstractType" -> true
-      if(m.isTemplate) j += "isTemplate" -> true
+      if(compactFlags) {
+        if(m.isDef) set(j, 'd')
+        if(m.isVal) set(j, 'v')
+        if(m.isLazyVal) set(j, 'l')
+        if(m.isVar) set(j, 'V')
+        if(m.isImplicit) set(j, 'm')
+        if(m.isConstructor) set(j, 'n')
+        if(m.isAliasType) set(j, 'a')
+        if(m.isAbstractType) set(j, 'A')
+        if(m.isTemplate) set(j, 'M')
+      } else {
+        if(m.isDef) j += "isDef" -> true
+        if(m.isVal) j += "isVal" -> true
+        if(m.isLazyVal) j += "isLazyVal" -> true
+        if(m.isVar) j += "isVar" -> true
+        if(m.isImplicit) j += "isImplicit" -> true
+        if(m.isConstructor) j += "isConstructor" -> true
+        if(m.isAliasType) j += "isAliasType" -> true
+        if(m.isAbstractType) j += "isAbstractType" -> true
+        if(m.isTemplate) j += "isTemplate" -> true
+      }
     }
     as[DocTemplateEntity](e) { t =>
       t.sourceUrl foreach { u => j +?= "sourceUrl" -> u.toString }
@@ -169,16 +211,27 @@ abstract class JsonBuilder[Link : CanBeValue] {
     as[Class](e) { c =>
       c.primaryConstructor foreach { c => j += "primaryConstructor" -> global(c)(createEntity _) }
       j +?= "constructors" -> JArray(c.constructors.map(e => global(e)(createEntity _)))
-      if(c.isCaseClass) j += "isCaseClass" -> true
+      if(c.isCaseClass) {
+        if(compactFlags) set(j, 'C')
+        else j += "isCaseClass" -> true
+      }
     }
     as[Package](e) { p => j +?= "packages" -> JArray(p.packages.map(e => global(e)(createEntity _))) }
-    as[NonTemplateMemberEntity](e) { n => if(n.isUseCase) j += "isUseCase" -> true }
+    as[NonTemplateMemberEntity](e) { n =>
+      if(n.isUseCase) {
+        if(compactFlags) set(j, 'U')
+        else j += "isUseCase" -> true
+      }
+    }
     as[Def](e) { d =>
       j +?= "typeParams" -> JArray(d.typeParams.map(e => global(e)(createEntity _)))
       j +?= "valueParams" -> JArray(d.valueParams.map(l => JArray(l.map(e => global(e)(createEntity _)))))
     }
     as[Constructor](e) { c =>
-      if(c.isPrimary) j += "isPrimary" -> true
+      if(c.isPrimary) {
+        if(compactFlags) set(j, 'P')
+        else j += "isPrimary" -> true
+      }
       j +?= "valueParams" -> JArray(c.valueParams.map(l => JArray(l.map(e => global(e)(createEntity _)))))
     }
     as[AbstractType](e) { a =>
@@ -187,8 +240,13 @@ abstract class JsonBuilder[Link : CanBeValue] {
     }
     as[AliasType](e) { a => j += "alias" -> createTypeEntity(a.alias) }
     as[ParameterEntity](e) { p =>
-      if(p.isTypeParam) j += "isTypeParam" -> true
-      if(p.isValueParam) j += "isValueParam" -> true
+      if(compactFlags) {
+        if(p.isTypeParam) set(j, 'y')
+        if(p.isValueParam) set(j, 'R')
+      } else {
+        if(p.isTypeParam) j += "isTypeParam" -> true
+        if(p.isValueParam) j += "isValueParam" -> true
+      }
       j -= "inTemplate"
     }
     as[TypeParam](e) { t =>
@@ -199,8 +257,47 @@ abstract class JsonBuilder[Link : CanBeValue] {
     as[ValueParam](e) { v =>
       j += "resultType" -> createTypeEntity(v.resultType)
       v.defaultValue foreach { s => j += "defaultValue" -> s }
-      if(v.isImplicit) j += "isImplicit" -> true
+      if(v.isImplicit) {
+        if(compactFlags) set(j, 'm')
+        else j += "isImplicit" -> true
+      }
     }
     j
+  }
+
+  /**
+   * Set a flag in the "is" field.
+   * o: isProtected
+   * u: isPublic
+   * i: isPrivateInInstance
+   * O: isProtectedInInstance
+   * e: isPrivateInTemplate
+   * E: isProtectedInTemplate
+   * p: isPackage
+   * r: isRootPackage
+   * t: isTrait
+   * c: isClass
+   * b: isObject
+   * D: isDocTemplate
+   * d: isDef
+   * v: isVal
+   * l: isLazyVal
+   * V: isVar
+   * m: isImplicit
+   * n: isConstructor
+   * a: isAliasType
+   * A: isAbstractType
+   * M: isTemplate
+   * C: isCaseClass
+   * U: isUseCase
+   * P: isPrimary
+   * y: isTypeParam
+   * R: isValueParam
+   * s: isSealed
+   * B: isAbstract
+   * f: isFinal
+   */
+  def set(j: JObject, flag: Char) {
+    j += "is" -> ((j("is") getOrElse "") + flag.toString)
   }
 }

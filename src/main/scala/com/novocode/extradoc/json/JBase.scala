@@ -88,7 +88,7 @@ object JBase {
 final class JObject extends JBase {
   private val m = new mutable.HashMap[String, Any]
   def += [V](t: (String, V))(implicit cv: CanBeValue[V]) {
-    if(m contains t._1) throw new RuntimeException("Cannot overwrite field "+t._1)
+    //if(m contains t._1) throw new RuntimeException("Cannot overwrite field "+t._1)
     m += t
   }
   def +?= [V](t: (String, V))(implicit cv: CanBeValue[V]) =
