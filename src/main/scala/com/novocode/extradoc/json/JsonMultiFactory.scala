@@ -107,7 +107,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
         allModels filter { case (ord, j) => p.objects contains ord } map { _._2 } foreach { replaceIn _ }
       }
     }
-    println("Inlined "+totalInlined+" extra objects")
+    println("Inlined "+totalInlined+" objects")
     val remappedIDs = new mutable.HashMap[Link, (Int, Int)]
     for(p <- pages.values) {
       p.renumbered += p.main

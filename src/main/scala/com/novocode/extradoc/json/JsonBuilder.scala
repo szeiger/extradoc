@@ -25,25 +25,6 @@ abstract class JsonBuilder[Link : CanBeValue] {
     }
   }
 
-  def createVisibility(v: Visibility): JObject = {
-    val j = new JObject
-    if(!compactFlags) {
-      if(v.isProtected) j += "isProtected" -> true
-      if(v.isPublic) j += "isPublic" -> true
-      if(v.isInstanceOf[PrivateInInstance]) j += "isPrivateInInstance" -> true
-      if(v.isInstanceOf[ProtectedInInstance]) j += "isProtectedInInstance" -> true
-    }
-    as[PrivateInTemplate](v) { p =>
-      if(!compactFlags) j += "isPrivateInTemplate" -> true
-      j += "owner" -> global(p.owner)(createEntity _)
-    }
-    as[ProtectedInTemplate](v) { p =>
-      if(!compactFlags) j += "isProtectedInTemplate" -> true
-      j += "owner" -> global(p.owner)(createEntity _)
-    }
-    j
-  }
-
   def createHtml(f: HtmlGen => NodeSeq) = {
     val gen = new CollectingHtmlGen
     val ns = f(gen)
@@ -59,7 +40,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
 
   def createInline(i: Inline) = createHtml(_.inlineToHtml(i))
 
-  def createComment(c: Comment): JObject = {
+  def createComment(c: Comment): (JObject, Map[String, JObject], Map[String, JObject]) = {
     val j = new JObject
     j +?= "body" -> createBody(c.body)
     j +?= "short" -> createInline(c.short)
@@ -67,16 +48,15 @@ abstract class JsonBuilder[Link : CanBeValue] {
     j +?= "see" -> JArray(c.see.map(createBody _))
     c.result foreach { b => j +?= "result" -> createBody(b) }
     j +?= "throws" -> JObject(c.throws.map { case (k,v) => k -> createBody(v) })
-    j +?= "valueParams" -> JObject(c.valueParams.map { case (k,v) => k -> createBody(v) })
-    j +?= "typeParams" -> JObject(c.typeParams.map { case (k,v) => k -> createBody(v) })
-    j
+    val vParams = c.valueParams.map { case (k,v) => k -> createBody(v) }
+    val tParams = c.typeParams.map { case (k,v) => k -> createBody(v) }
     c.version foreach { b => j +?= "version" -> createBody(b) }
     c.since foreach { b => j +?= "since" -> createBody(b) }
     j +?= "todo" -> JArray(c.todo.map(createBody _))
     c.deprecated foreach { b => j +?= "deprecated" -> createBody(b) }
     j +?= "note" -> JArray(c.note.map(createBody _))
     j +?= "example" -> JArray(c.example.map(createBody _))
-    j
+    (j, vParams, tParams)
   }
 
   def createTypeEntity(t: TypeEntity): JObject = {
@@ -140,19 +120,26 @@ abstract class JsonBuilder[Link : CanBeValue] {
       }
     }
     //as[NoDocTemplate](e) { t => j += "isNoDocTemplate" -> true }
+    var vParams: Map[String, JObject] = Map.empty
+    var tParams: Map[String, JObject] = Map.empty
     as[MemberEntity](e) { m =>
-      m.comment foreach { c => j += "comment" -> createComment(c) }
+      m.comment foreach { c =>
+        val (comment, v, t) = createComment(c)
+        j += "comment" -> comment
+        vParams = v
+        tParams = t
+      }
       j += "inDefinitionTemplates" -> JArray(m.inDefinitionTemplates.map(e => global(e)(createEntity _)))
       j +?= "definitionName" -> m.definitionName
       if(compactFlags) {
         if(m.visibility.isProtected) set(j, 'o')
         if(m.visibility.isPublic) set(j, 'u')
-        if(m.visibility.isInstanceOf[PrivateInInstance]) set(j, 'i')
-        if(m.visibility.isInstanceOf[ProtectedInInstance]) set(j, 'O')
-        if(m.visibility.isInstanceOf[PrivateInTemplate]) set(j, 'e')
-        if(m.visibility.isInstanceOf[ProtectedInTemplate]) set(j, 'E')
+      } else {
+        if(m.visibility.isProtected) j += "isProtected" -> true
+        if(m.visibility.isPublic) j += "isPublic" -> true
       }
-      j +?= "visibility" -> createVisibility(m.visibility)
+      as[PrivateInTemplate](m.visibility) { p => j += "visibleIn" -> global(p.owner)(createEntity _) }
+      as[ProtectedInTemplate](m.visibility) { p => j += "visibleIn" -> global(p.owner)(createEntity _) }
       m.flags.map(createBlock _) foreach { fj =>
         fj("_html") match {
           case Some("<p>sealed</p>") =>
@@ -191,7 +178,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
     }
     as[DocTemplateEntity](e) { t =>
       t.sourceUrl foreach { u => j +?= "sourceUrl" -> u.toString }
-      j +?= "typeParams" -> JArray(t.typeParams.map(e => global(e)(createEntity _)))
+      j +?= "typeParams" -> createTypeParams(t.typeParams, tParams)
       t.parentType foreach { p => j += "parentType" -> createTypeEntity(p) }
       j +?= "parentTemplates" -> JArray(t.parentTemplates.map(e => global(e)(createEntity _)))
       j +?= "linearization" -> JArray(t.linearization.map(e => global(e)(createEntity _)))
@@ -206,7 +193,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
       t.companion foreach { p => j += "companion" -> global(p)(createEntity _) }
     }
     as[Trait](e) { t =>
-      j +?= "valueParams" -> JArray(t.valueParams.map(l => JArray(l.map(e => global(e)(createEntity _)))))
+      j +?= "valueParams" -> createValueParams(t.valueParams, vParams)
     }
     as[Class](e) { c =>
       c.primaryConstructor foreach { c => j += "primaryConstructor" -> global(c)(createEntity _) }
@@ -224,15 +211,15 @@ abstract class JsonBuilder[Link : CanBeValue] {
       }
     }
     as[Def](e) { d =>
-      j +?= "typeParams" -> JArray(d.typeParams.map(e => global(e)(createEntity _)))
-      j +?= "valueParams" -> JArray(d.valueParams.map(l => JArray(l.map(e => global(e)(createEntity _)))))
+      j +?= "typeParams" -> createTypeParams(d.typeParams, tParams)
+      j +?= "valueParams" -> createValueParams(d.valueParams, vParams)
     }
     as[Constructor](e) { c =>
       if(c.isPrimary) {
         if(compactFlags) set(j, 'P')
         else j += "isPrimary" -> true
       }
-      j +?= "valueParams" -> JArray(c.valueParams.map(l => JArray(l.map(e => global(e)(createEntity _)))))
+      j +?= "valueParams" -> createValueParams(c.valueParams, vParams)
     }
     as[AbstractType](e) { a =>
       a.lo foreach { t => j +?= "lo" -> createTypeEntity(t) }
@@ -265,14 +252,26 @@ abstract class JsonBuilder[Link : CanBeValue] {
     j
   }
 
+  def createValueParams(vp: List[List[ValueParam]], docs: Map[String, JObject]) = {
+    JArray(vp.map(l => JArray(l.map(e => global(e) { e =>
+      val j = createEntity(e)
+      docs get e.name foreach { doc => j += "doc" -> doc }
+      j
+    }))))
+  }
+
+  def createTypeParams(tp: List[TypeParam], docs: Map[String, JObject]) = {
+    JArray(tp.map(e => global(e) { e =>
+      val j = createEntity(e)
+      docs get e.name foreach { doc => j += "doc" -> doc }
+      j
+    }))
+  }
+
   /**
    * Set a flag in the "is" field.
    * o: isProtected
    * u: isPublic
-   * i: isPrivateInInstance
-   * O: isProtectedInInstance
-   * e: isPrivateInTemplate
-   * E: isProtectedInTemplate
    * p: isPackage
    * r: isRootPackage
    * t: isTrait

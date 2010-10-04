@@ -1,7 +1,7 @@
 (function(){
 
 var linkKeys = {
-  "owner": true,
+  "visibleIn": true,
   "inTemplate": true,
   "companion": true,
   "primaryConstructor": true,
@@ -24,7 +24,7 @@ var linkKeys = {
   "e": true
 };
 
-var mapKeys = { "throws": true, "valueParams": true, "typeParams": true };
+var mapKeys = { "throws": true };
 
 function log(msg) {
   if(window.console) console.log(msg);
@@ -100,10 +100,6 @@ function resolveObject(o, name) {
         switch(is.charAt(i)) {
           case 'o': o.isProtected = true; break;
           case 'u': o.isPublic = true; break;
-          case 'i': o.isPrivateInInstance = true; break;
-          case 'O': o.isProtectedInInstance = true; break;
-          case 'e': o.isPrivateInTemplate = true; break;
-          case 'E': o.isProtectedInTemplate = true; break;
           case 'p': o.isPackage = true; break;
           case 'r': o.isRootPackage = true; break;
           case 't': o.isTrait = true; break;
@@ -255,11 +251,10 @@ window.extradoc = ex;
 })();
 
 /*
-
 Identifiers by type
 ===================
 link-or-entity
-  "owner"
+  "visibleIn"
   "inTemplate"
   "companion"
   "primaryConstructor"
@@ -285,15 +280,10 @@ link-or-entity[][]
 
 special:
   "refEntity" { quoted-int*: { "e": link-or-entity, "l": int } }
-  "visibility" visibility{}
 
 boolean
   "isProtected"
   "isPublic"
-  "isPrivateInInstance"
-  "isProtectedInInstance"
-  "isPrivateInTemplate"
-  "isProtectedInTemplate"
   "isPackage"
   "isRootPackage"
   "isTrait"
@@ -357,87 +347,4 @@ type-entity{}
   "lo"
   "hi"
   "alias"
-
-All identifiers
-===============
-"isProtected" boolean
-"isPublic" boolean
-"isPrivateInInstance" boolean
-"isProtectedInInstance" boolean
-"isPrivateInTemplate" boolean
-"owner" link-or-entity
-"isProtectedInTemplate" boolean
-"_links" link[]
-"_html" html-string
-"body" html-wrapper
-"short" html-wrapper
-"authors" html-wrapper[]
-"see" html-wrapper[]
-"result" html-wrapper
-"throws" map[string -> html-wraper]
-"valueParams" (from comment) map[string -> html-wrapper]
-"valueParams" (from entity) link-or-entity[][]
-"typeParams" (from comment) map[string -> html-wrapper]
-"typeParams" (from entity) link-or-entity[]
-"version" html-wrapper
-"since" html-wrapper
-"todo" html-wrapper[]
-"deprecated" html-wrapper
-"note" html-wrapper[]
-"example" html-wrapper[]
-"name" string
-"refEntity" { quoted-int*: { "e": link-or-entity, "l": int } }
-"inTemplate" link-or-entity
-"qName" string
-"isPackage" boolean
-"isRootPackage" boolean
-"isTrait" boolean
-"isClass" boolean
-"isObject" boolean
-"isDocTemplate" boolean
-"comment" html-wrapper
-"inDefinitionTemplates" link-or-entity[]
-"definitionName" string
-"visibility" {}
-"flags" html-wrapper[]
-"deprecation" html-wrapper
-"inheritedFrom" link-or-entity[]
-"resultType" {}
-"isDef" boolean
-"isVal" boolean
-"isLazyVal" boolean
-"isVar" boolean
-"isImplicit" boolean
-"isConstructor" boolean
-"isAliasType" boolean
-"isAbstractType" boolean
-"isTemplate" boolean
-"sourceUrl" url-string
-"parentType" {}
-"parentTemplates" link-or-entity[]
-"linearization" link-or-entity[]
-"subClasses" link-or-entity[]
-"templates" link-or-entity[]
-"methods" link-or-entity[]
-"values" link-or-entity[]
-"abstractTypes" link-or-entity[]
-"aliasTypes" link-or-entity[]
-"companion" link-or-entity
-"primaryConstructor" link-or-entity
-"constructors" link-or-entity[]
-"isCaseClass" boolean
-"packages" link-or-entity[]
-"isUseCase" boolean
-"isPrimary" boolean
-"lo" {}
-"hi" {}
-"alias" {}
-"isTypeParam" boolean
-"isValueParam" boolean
-"variance" string
-"defaultValue" string
-"isSealed" boolean
-"isAbstract" boolean
-"isFinal" boolean
-"is" string
 */
