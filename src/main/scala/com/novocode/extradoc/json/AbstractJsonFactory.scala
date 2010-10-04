@@ -7,9 +7,10 @@ import comment._
 import java.io.{PrintStream, FileOutputStream, BufferedOutputStream, StringWriter, File => JFile}
 import scala.collection._
 
-abstract class AbstractJsonFactory {
+abstract class AbstractJsonFactory { self =>
 
   val doInline = true
+  val typeEntitiesAsHtml = false
 
   def prepareModel(universe: Universe) = {
     println("Building JSON model")
@@ -29,6 +30,7 @@ abstract class AbstractJsonFactory {
     val allModels = new mutable.HashMap[Int, JBase]
     val allModelsReverse = new mutable.HashMap[JBase, Int]
     val builder = new JsonBuilder[Link] {
+      val typeEntitiesAsHtml = self.typeEntitiesAsHtml
       def global[T <: Entity](e: T)(f: T => JBase) = globalEntityOrdinals.get(EntityHash(e)) match {
         case Some(ord) => Link(ord)
         case None =>

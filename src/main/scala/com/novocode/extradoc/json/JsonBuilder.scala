@@ -5,9 +5,11 @@ import model._
 import comment._
 
 import scala.collection._
-import scala.xml.{Xhtml, NodeSeq}
+import scala.xml.{Xhtml, NodeSeq, NodeBuffer, Text, Elem}
 
 abstract class JsonBuilder[Link : CanBeValue] {
+
+  val typeEntitiesAsHtml: Boolean
 
   def global[T <: Entity](e: T)(f: T => JBase): Link
 
@@ -76,20 +78,38 @@ abstract class JsonBuilder[Link : CanBeValue] {
 
   def createTypeEntity(t: TypeEntity): JObject = {
     val j = new JObject
-    j += "name" -> t.name
-    j +?= "refEntity" -> JObject(t.refEntity.map {
-      case (k,v) =>
-        val vv = new JObject
-        vv += "e" -> global(v._1)(createEntity _)
-        vv += "l" -> v._2
-        k.toString -> vv
-    })
+    if(typeEntitiesAsHtml) {
+      val b = new NodeBuffer
+      val links = new mutable.ArrayBuffer[Link]
+      val name = t.name
+      var pos = 0
+      t.refEntity foreach { case (start, (ref, len)) =>
+        if(pos < start) b += Text(name.substring(pos, start))
+        links += global(ref)(createEntity _)
+        b += Elem(null, "a", null, xml.TopScope, Text(name.substring(start, start+len)))
+        pos = start+len
+      }
+      if(pos < name.length-1) b += Text(name.substring(pos))
+      j += "_xname" -> Xhtml.toXhtml(b)
+      j +?= "_refs" -> JArray(links)
+    } else {
+      j += "name" -> t.name
+      j +?= "refEntity" -> JArray(t.refEntity.map {
+        case (k,v) =>
+          val vv = new JObject
+          vv += "s" -> k
+          vv += "l" -> v._2
+          vv += "e" -> global(v._1)(createEntity _)
+          vv
+      })
+    }
     j
   }
 
   def createEntity(e: Entity): JObject = {
     val j = new JObject
     j += "inTemplate" -> global(e.inTemplate)(createEntity _)
+    // "toRoot" is own ID plus recursively toRoot of inTemplate
     //j += "toRoot" -> JArray(e.toRoot.map(e => global(e)(createEntity _)))
     val qName = e.qualifiedName
     var name = e.name

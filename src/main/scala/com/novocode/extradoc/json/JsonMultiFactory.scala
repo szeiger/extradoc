@@ -13,6 +13,8 @@ class JsonMultiFactory(val universe: Universe) extends AbstractJsonFactory {
   // the size of extra objects which are included in many pages
   override val doInline = false
 
+  override val typeEntitiesAsHtml = true
+
   case class Page(no: Int, main: Int) {
     val objects = new mutable.HashSet[Int]
     val renumbered = new mutable.ArrayBuffer[Int]
@@ -22,37 +24,42 @@ class JsonMultiFactory(val universe: Universe) extends AbstractJsonFactory {
     val (allModels, _) = prepareModel(universe)
     val pages = findGlobal(allModels).toSeq.sorted.
       zipWithIndex map { case (ord,idx) => (ord, Page(idx, ord))} toMap;
-    def findPage(j: JBase): Option[Page] = j match {
-      case j: JObject => j("inTemplate") match {
-        case Some(Link(target)) =>
-          pages get target orElse (allModels get target flatMap (findPage _))
-        case Some(j: JObject) => findPage(j)
-        case None => None
-      }
+    def findPage(ord: Int, j: JBase): Option[Page] = j match {
+      case j: JObject =>
+        // Don't map external packages to their parents
+        if(ord >= 0 && j("isPackage").getOrElse(false) == true && !(pages contains ord)) None
+        else j("inTemplate") match {
+          case Some(Link(target)) =>
+            pages get target orElse (allModels get target flatMap (ch => findPage(target, ch)))
+          case Some(j: JObject) => findPage(-1, j)
+          case None => None
+        }
       case _ => None
     }
     var extra = new mutable.HashSet[Int]
     allModels foreach { case (ord, j) =>
-      (findPage(j) map (_.objects) getOrElse extra) += ord
+      (pages get ord orElse findPage(ord, j) map (_.objects) getOrElse extra) += ord
     }
     println("Mapping "+extra.size+" extra objects to all pages that need them")
     var extraTotal = 0
-    pages.values foreach { p =>
-      p.objects map allModels foreach {
-        _ foreachRec {
-          _.links foreach { l =>
-            if(extra contains l.target) {
-              if(!(p.objects contains l.target)) {
-                extraTotal += 1
-                p.objects += l.target
-              }
+    def mapExtras(p: Page, j: JBase) {
+      j foreachRec {
+        _.links foreach { l =>
+          if(extra contains l.target) {
+            if(!(p.objects contains l.target)) {
+              extraTotal += 1
+              p.objects += l.target
+              mapExtras(p, allModels(l.target))
             }
           }
         }
       }
     }
+    pages.values foreach { p =>
+      p.objects map allModels foreach { j => mapExtras(p, j) }
+    }
     println("Total number of extra objects on all pages: "+extraTotal)
-    println("Inlining extras on all pages")
+    println("Inlining objects on all pages")
     val keepHtmlLinks = new mutable.HashSet[Int]
     allModels.values foreach {
       _ foreachRec {
@@ -95,7 +102,7 @@ class JsonMultiFactory(val universe: Universe) extends AbstractJsonFactory {
     for(p <- pages.values) {
       p.renumbered += p.main
       remappedIDs += Link(p.main) -> (p.no, 0)
-      p.objects foreach { ord =>
+      for(ord <- p.objects if ord != p.main) {
         remappedIDs += Link(ord) -> (p.no, p.renumbered.size)
         p.renumbered += ord
       }

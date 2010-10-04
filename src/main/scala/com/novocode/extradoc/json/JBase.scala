@@ -4,7 +4,7 @@ import scala.tools.nsc.doc._
 import model._
 import comment._
 
-import java.io.Writer
+import java.io.{Writer, StringWriter}
 import scala.collection._
 
 abstract class CanBeValue[-T] {
@@ -58,6 +58,11 @@ sealed abstract class JBase {
   def foreachRec(f: JBase => Unit) {
     f(this)
     children foreach { _.foreachRec(f) }
+  }
+  override def toString = {
+    val wr = new StringWriter
+    writeTo(wr, {_.target})
+    wr.toString
   }
 }
 
