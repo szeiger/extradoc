@@ -25,10 +25,12 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     if(explorer) {
       val p = "/com/novocode/extradoc/explorer"
       copyResource(p, "index.html")
-      copyResource(p, "extradoc.js")
-      copyResource(p, "extradoc.css")
-      copyResource(p, "jquery.js")
-      copyResource(p, "jquery.history.js")
+      copyResource(p, "css/extradoc.css")
+      copyResource(p, "js/extradoc.js")
+      copyResource(p, "js/explorer.js")
+      copyResource(p, "js/jquery-1.4.2.min.js")
+      copyResource(p, "js/jquery-ui-1.8.5.custom.min.js")
+      copyResource(p, "js/jquery.history.js")
     }
 
     val (allModels, _) = prepareModel(universe)
@@ -118,6 +120,12 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       }
     }
     println("Writing p0.json to p"+(pages.size-1)+".json")
+    val globalNames = new mutable.HashMap[String, String]
+    def qNameToName(qName: String) = {
+      val (s1, s2) = (qName.lastIndexOf('#'), qName.lastIndexOf('.'))
+      val sep = if(s1 > s2) s1 else s2
+      qName.substring(sep+1)
+    }
     for(p <- pages.values) {
       val renumberedMap = p.renumbered.zipWithIndex.toMap
       JsonWriter(siteRoot, "p"+p.no+".json") createArray { w =>
@@ -125,11 +133,53 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
           w.write(allModels(ord), { l: Link =>
             renumberedMap get l.target getOrElse {
               val (page, idx) = remappedIDs(l)
+              if(idx == 0 || page != p.no) {
+                val jo = allModels(l.target).asInstanceOf[JObject]
+                jo("name") orElse { jo("qName") map { q => qNameToName(q.asInstanceOf[String]) } } foreach { case n: String =>
+                  globalNames += page+","+idx -> n
+                }
+              }
               JArray(Seq(page, idx))
             }
           })
         }
       }
+    }
+    val pageObjects = pages.values map { p => (p.no, allModels(p.main)) }
+    val allPackages = pageObjects filter { case (_, j: JObject) =>
+      j("isPackage").getOrElse(false) == true || j("is").getOrElse("").asInstanceOf[String].contains('p')
+    } toMap
+    val linearPackages = allPackages.toSeq sortBy { case (_, j: JObject) => j("qName").get.asInstanceOf[String] }
+    println("Writing global.json")
+    JsonWriter(siteRoot, "global.json") createObject { w =>
+      w.write("names", JObject(globalNames), { _.target })
+      w.write("packages", JArray(linearPackages map { case (no, j: JObject) =>
+        val jo = new JObject
+        jo += "p" -> no
+        jo += "n" -> j("qName").get.asInstanceOf[String]
+        j("templates") foreach { case a: JArray =>
+          val children = a.values collect { case l: Link => (l.target, allModels(l.target)) }
+          val tlChildren = children map { case (ord, j: JObject) =>
+            val is = j("is").getOrElse("").asInstanceOf[String]
+            val kind =
+              if(j("isClass").getOrElse(false) == true || is.contains('c')) 'c'
+              else if(j("isTrait").getOrElse(false) == true || is.contains('t')) 't'
+              else if(j("isObject").getOrElse(false) == true || is.contains('b')) 'b'
+              else '_'
+            (ord, j, kind)
+          } filter { case (ord, _, kind) => (pages contains ord) && (kind != '_') } toSeq;
+          val sortedChildren = tlChildren sortBy { case (_, j: JObject, kind) =>
+            (j("qName").getOrElse("").asInstanceOf[String].toLowerCase, kind)
+          }
+          jo +?= "e" -> JArray(sortedChildren map { case (ord, _, kind) =>
+            val ch = new JObject
+            ch += "p" -> pages(ord).no
+            ch += "k" -> kind.toString
+            ch
+          })
+        }
+        jo
+      }), { _.target })
     }
   }
 }

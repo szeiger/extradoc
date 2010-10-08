@@ -26,29 +26,9 @@ var linkKeys = {
 
 var mapKeys = { "throws": true };
 
-function log(msg) {
-  if(window.console) console.log(msg);
-}
+ex = { currentPage: null };
 
-function e(n, as, p) {
-  var n = document.createElement(n);
-  if(as)
-    for(var a in as)
-      if(as.hasOwnProperty(a))
-        n.setAttribute(a, as[a]);
-  if(p) p.appendChild(n);
-  return n;
-}
-
-function t(t, p) {
-  var n = document.createTextNode(t);
-  if(p) p.appendChild(n);
-  return n;
-}
-
-ex = { log: log, currentPage: null };
-
-ex.getEntityName = function(e) {
+function getEntityName(e) {
   if(e.name) return e.name;
   var q = e.qName;
   var sep1 = q.lastIndexOf('#');
@@ -70,30 +50,19 @@ ex.load = function(pageNo, ok, err) {
   });
 };
 
-function fireOnEntityLink(o) {
-  if(ex.onEntityLink) ex.onEntityLink(o[0], o[1]);
-  return false;
-}
-
 ex.resolvePage = function(page, pageNo) {
+  ex.currentPage = page;
   page._no = pageNo;
   for(var i=0; i<page.length; i++) resolveObject(page[i], null);
-  return page;
-};
-
-ex.scrollToEntity = function(entity) {
-  var pos;
-  if(entity >= 0) {
-    pos = $($("ol.page > li")[entity]).offset().top-12;
-    if(pos < 0) pos = 0;
-  } else pos = 0;
-  $(window).scrollTop(pos);
 };
 
 function resolveObject(o, name) {
   var isMap = !!mapKeys[name];
   if(!isMap) {
-    if(o.qName) o._isEntity = true;
+    if(o.qName) {
+      o._isEntity = true;
+      if(!o.name) o.name = getEntityName(o);
+    }
     if(o.is) {
       var is = o.is;
       for(var i=0; i<is.length; i++) {
@@ -167,83 +136,16 @@ function resolveArray(o, name) {
   }
 }
 
-function createObjectDOM(o, no) {
-  var tableE = e("table", { "class": "object", cellspacing: 0, cellpadding: 0 });
-  var tbodyE = e("tbody", null, tableE);
-  if(o._isEntity) {
-    var trE = e("tr", null, tbodyE);
-    var thE = e("th", { colspan: 2, "class": "entityhead" }, trE);
-    t(o.qName, thE);
-  }
-  for(var k in o) {
-    if(!o.hasOwnProperty(k) || k[0] == "_") continue;
-    var trE = e("tr", null, tbodyE);
-    var thE = e("th", null, trE);
-    var tdE = e("td", null, trE);
-    t(k, thE);
-    if(k == "sourceUrl") e("a", { href: o[k] }, tdE).appendChild(t(o[k]));
-    else tdE.appendChild(createChildDOM(o[k]));
-  }
-  return tableE;
-}
-
-function createArrayDOM(o) {
-  var olE = e("ol", { start: 0, "class": "array" });
-  for(var i=0; i<o.length; i++) {
-    var liE = e("li", null, olE);
-    liE.appendChild(createChildDOM(o[i]));
-  }
-  return olE;
-}
-
-function createHtmlDOM(o) {
-  var divE = e("div", { "class": "html" });
-  $(divE).append(o._html);
-  return divE;
-}
-
-function createXNameDOM(o) {
-  var spanE = e("span");
-  $(spanE).append(o._xname);
-  $("a", spanE).each(function(idx) {
-    this.href = "##";
-    this.onclick = function() { return fireOnEntityLink(o._refs[idx]); }
+ex.loadGlobal = function(ok, err) {
+  $.ajax({
+    url: 'global.json',
+    dataType: 'text',
+    success: function(data) {
+      eval("window.extradoc.global = "+data);
+      ok(ex.global);
+    },
+    error: err
   });
-  return spanE;
-}
-
-function createChildDOM(o) {
-  var tp = typeof(o);
-  if(tp == "string") return t(o);
-  else if(tp == "number") return t(o);
-  else if(tp == "boolean") return t(o);
-  else if(o._isLink) {
-    var aE = e("a", { href: "#" });
-    aE.onclick = function() { return fireOnEntityLink(o); }
-    if(o[0] == ex.currentPage._no) t(ex.getEntityName(ex.currentPage[o[1]]), aE);
-    else t("["+o[0]+", "+o[1]+"]", aE);
-    return aE;
-  }
-  else if(o.hasOwnProperty("length")) {
-    if(o.length > 0) return createArrayDOM(o);
-    else return t("[]");
-  }
-  else if(o.hasOwnProperty("_html")) return createHtmlDOM(o);
-  else if(o.hasOwnProperty("_xname")) return createXNameDOM(o);
-  else return createObjectDOM(o);
-}
-
-function createEntityDOM(entity, no) {
-  return createObjectDOM(entity, no);
-}
-
-ex.createPageDOM = function(page) {
-  var olE = e("ol", { "class": "page", start: 0 });
-  for(var i=0; i<page.length; i++) {
-    var liE = e("li", null, olE);
-    liE.appendChild(createEntityDOM(page[i], i));
-  }
-  return olE;
 };
 
 window.extradoc = ex;
@@ -253,33 +155,8 @@ window.extradoc = ex;
 /*
 Identifiers by type
 ===================
-link-or-entity
-  "visibleIn"
-  "inTemplate"
-  "companion"
-  "primaryConstructor"
-
-link-or-entity[]
-  "typeParams" (from entity)
-  "inDefinitionTemplates"
-  "inheritedFrom"
-  "parentTemplates"
-  "linearization"
-  "subClasses"
-  "templates"
-  "methods"
-  "values"
-  "abstractTypes"
-  "aliasTypes"
-  "constructors"
-  "packages"
-  "_links" link[]
-
-link-or-entity[][]
-  "valueParams" (from entity)
-
-special:
-  "refEntity" { quoted-int*: { "e": link-or-entity, "l": int } }
+link-or-entity, link-or-entity[], link-or-entity[][]
+  (see linkKeys)
 
 boolean
   "isProtected"

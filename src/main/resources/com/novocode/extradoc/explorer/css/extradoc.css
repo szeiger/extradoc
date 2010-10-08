@@ -1,0 +1,285 @@
+/* Global *******************************************************************/
+
+html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: white;
+  color: black;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font: 14px "Segoe UI","Lucida Grande","Lucida Sans Unicode",sans-serif;
+}
+
+/* Header *******************************************************************/
+
+#header {
+  font-size: 14px;
+  line-height: 21px;
+  margin: 0;
+  padding: 3px 6px;
+  background-color: black;
+  background-image: -webkit-gradient(
+    linear,
+    left bottom,
+    left top,
+    color-stop(0, #505050),
+    color-stop(1, #303030)
+  );
+  background-image: -moz-linear-gradient(
+    center bottom,
+    #505050 0%,
+    #303030 100%
+  );
+  border-bottom: 1px solid black;
+  color: white;
+  height: 1.5em;
+  font-weight: bold;
+  z-index: 100;
+}
+
+#header h1 {
+  margin: 0;
+  font-size: 1em;
+  font-weight: inherit;
+}
+
+/* Navigation Area **********************************************************/
+
+#navigation {
+  position: absolute;
+  top: 28px;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  overflow: auto;
+  background-color: #fafafa;
+  z-index: 0;
+}
+
+#navigation ul.packages {
+  margin: 0;
+  padding: 0;
+  display: block;
+}
+
+#navigation ul.packages > li {
+  display: block;
+}
+
+#navigation ul.packages > li > span {
+  display: block;
+  padding: 1px 1px;
+  background-image: -webkit-gradient(
+    linear,
+    left bottom,
+    left top,
+    color-stop(0, #fafafa),
+    color-stop(1, #f0f0f0)
+  );
+  background-image: -moz-linear-gradient(
+    center bottom,
+    #fafafa 0%,
+    #f0f0f0 100%
+  );
+  border-top: 1px solid #cdcdcd;
+  border-left: 1px solid #f0f0f0;
+  border-right: 1px solid #f0f0f0;
+}
+
+#navigation ul.packages > li > span > a {
+  display: block;
+  padding: 2px 4px;
+  text-decoration: none;
+  color: black;
+}
+
+#navigation ul.packages > li > span > a:active, #navigation ul.packages > li > span > a:hover {
+  text-decoration: underline;
+}
+
+#navigation ul.packages > li.expanded > span {
+  -webkit-border-top-left-radius: 6px;
+  -moz-border-radius-topleft: 6px;
+  border-top-left-radius: 6px;
+  -webkit-border-top-right-radius: 6px;
+  -moz-border-radius-topright: 6px;
+  border-top-right-radius: 6px;
+  border-top: 1px solid #4e617f;
+  border-bottom: 1px solid #4e617f;
+  border-left: 1px solid #4e617f;
+  border-right: 1px solid #4e617f;
+  background-color: #4e617f;
+  background-image: -webkit-gradient(
+    linear,
+    left bottom,
+    left top,
+    color-stop(0, #33435c),
+    color-stop(0.49, #31415a),
+    color-stop(0.5, #485b79),
+    color-stop(0.8, #71849f),
+    color-stop(1, #687b98)
+  );
+  background-image: -moz-linear-gradient(
+    center bottom,
+    #33435c 0%,
+    #31415a 49%,
+    #485b79 50%,
+    #71849f 80%,
+    #687b98 100%
+  );
+  font-weight: bold;
+}
+
+#navigation ul.packages > li.expanded > span > a {
+  color: white;
+}
+
+#navigation ul.packages > li > table {
+  display: block;
+  padding: 6px 0;
+  margin: 0;
+  /*border-left: 1px solid #cdcdcd;
+  border-right: 1px solid #cdcdcd;
+  padding: 5px;*/
+}
+
+#navigation ul.packages > li > table tr.package td {
+  font-style: italic;
+}
+
+#navigation ul.packages > li > table th, #navigation ul.packages > li > table td {
+  border-top: 1px solid white;
+  border-bottom: 1px solid white;
+  border-color: transparent;
+  vertical-align: middle;
+}
+
+#navigation ul.packages > li > table th {
+  padding-top: 1px;
+  padding-left: 6px;
+}
+
+#navigation ul.packages > li > table th div {
+  -webkit-border-radius: 7px;
+  -moz-border-radius: 7px;
+  border-radius: 7px;
+  width: 14px;
+  height: 14px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: bold;
+  color: white;
+  background-color: #606060;
+}
+
+#navigation ul.packages > li > table th.class div {
+  background-color: #24763e;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #04561e), color-stop(1, #84c69e));
+  background-image: -moz-linear-gradient(center bottom, #04561e 0%, #84c69e 100%);
+}
+
+#navigation ul.packages > li > table th.object div {
+  background-color: #932222;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #730202), color-stop(1, #e37272));
+  background-image: -moz-linear-gradient(center bottom, #730202 0%, #e37272 100%);
+}
+
+#navigation ul.packages > li > table th.trait div {
+  background-color: #5564a9;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #354489), color-stop(1, #95a4e9));
+  background-image: -moz-linear-gradient(center bottom, #354489 0%, #95a4e9 100%);
+}
+
+#navigation ul.packages > li > table th.package div {
+  background-color: #bb712a;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #bb712a), color-stop(1, #fbb16a));
+  background-image: -moz-linear-gradient(center bottom, #bb712a 0%, #fbb16a 100%);
+}
+
+#navigation ul.packages > li > table td {
+  padding: 0 2px;
+  width: 100%;
+}
+
+#navigation ul.packages > li > table tr.selected th, #navigation ul.packages > li > table tr.selected td {
+  background-color: #e2e8ed;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #d2d8dd), color-stop(1, #ebf1f5));
+  background-image: -moz-linear-gradient(center bottom, #e2e8ed 0%, #ebf1f5 100%);
+  border-color: #e2e8ed;
+}
+
+#navigation ul.packages > li > table td > a {
+  padding-left: 0.5em;
+  color: inherit;
+  text-decoration: none;
+  display: block;
+}
+
+#navigation ul.packages > li > table td > a:active, #navigation ul.packages > li > table td > a:hover {
+  text-decoration: underline;
+}
+
+#separator {
+  position: absolute;
+  top: 28px;
+  left: 300px;
+  bottom: 0;
+  width: 4px;
+  background: transparent;
+  z-index: 1000;
+  cursor: e-resize;
+  border-left: 1px solid #a0a0a0;
+}
+
+/* Content Area *************************************************************/
+
+#content {
+  position: absolute;
+  margin: 0;
+  top: 28px;
+  left: 301px;
+  bottom: 0;
+  right: 0;
+  overflow: auto;
+}
+
+table.object {
+  border: 1px solid #c0c0c0;
+}
+
+table.object th {
+  text-align: right;
+  color: #606060;
+}
+
+table.object td, table.object th {
+  padding: 0.3em 0.3em;
+}
+
+ol.page > li {
+  margin-bottom: 0.5em;
+}
+
+div.html {
+  background-color: #f0f0f0;
+  padding: 0.2em 0.5em;
+  margin: 0;
+  border: 1px solid #c0c0c0;
+}
+
+table.object th.entityhead {
+  border-bottom: 1px solid #c0c0c0;
+  background-color: #f0f0f0;
+  color: black;
+  padding-right: 0.5em;
+}
+
+a {
+  color: #0000ff;
+}
