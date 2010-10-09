@@ -90,7 +90,7 @@ function createChildDOM(o) {
   else if(o._isLink) {
     var aE = e("a", { href: "#" });
     aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
-    if(o[0] == ex.currentPage._no) t(ex.currentPage[o[1]].name, aE);
+    if(o[0] == currentPage.no) t(currentPage.model[o[1]].name, aE);
     else t("["+o[0]+", "+o[1]+"]", aE);
     return aE;
   }
@@ -186,6 +186,26 @@ function markNavigationPage(no) {
 
 
 //////////////////////////////////////////////////////////////////////////////
+// Page loading and caching
+//////////////////////////////////////////////////////////////////////////////
+
+function Page(model) {
+  this.model = model;
+  this.no = model._no;
+}
+
+Page.prototype.getModelDOM = function() {
+  if(this.modelDOM) return this.modelDOM;
+  this.modelDOM = createPageDOM(this.model);
+  delete this.model;
+  return this.modelDOM;
+};
+
+var pageCache = new Cache(10);
+var currentPage;
+
+
+//////////////////////////////////////////////////////////////////////////////
 // Main program
 //////////////////////////////////////////////////////////////////////////////
 
@@ -195,22 +215,32 @@ var baseTitle = "Extradoc Explorer";
 function goToEntity(page, entity) { $.history.load("e/"+page+"/"+entity); }
 
 function loadPage(no, entity) {
-  $("#content").empty().append("Loading page "+no+"...");
+  $("#content").empty().append("Loading and rendering page "+no+"...");
   $(window).scrollTop(0);
   setTimeout(function() {
-    log("Loading data...");
-    var t0 = (new Date).getTime();
-    ex.load(no, function(page) {
-        log("Loaded and prepared page with "+page.length+" entities in "+((new Date).getTime()-t0)+"ms");
-        t0 = (new Date).getTime();
-        $("#content").empty().append(createPageDOM(page));
-        log("Rendered in "+((new Date).getTime()-t0)+"ms");
-        scrollToEntity(entity);
-      }, function(XMLHttpRequest, textStatus, errorThrown) {
-        var errmsg = "Error loading page: "+textStatus+"; "+errorThrown;
-        log(errmsg);
-        $("#content").empty().append(errmsg);
-      });
+    var cached = pageCache.getItem("p"+no);
+    if(cached) {
+      log("Retrieved page from cache");
+      currentPage = cached;
+      $("#content").empty().append(cached.getModelDOM());
+    } else {
+      log("Loading data...");
+      var t0 = (new Date).getTime();
+      ex.load(no, function(model) {
+          log("Loaded and prepared page with "+model.length+" entities in "+((new Date).getTime()-t0)+"ms");
+          t0 = (new Date).getTime();
+          var page = new Page(model);
+          currentPage = page;
+          pageCache.setItem("p"+no, page);
+          $("#content").empty().append(page.getModelDOM());
+          log("Rendered in "+((new Date).getTime()-t0)+"ms");
+          scrollToEntity(entity);
+        }, function(XMLHttpRequest, textStatus, errorThrown) {
+          var errmsg = "Error loading page: "+textStatus+"; "+errorThrown;
+          log(errmsg);
+          $("#content").empty().append(errmsg);
+        });
+    }
   }, 0);
 }
 
@@ -221,10 +251,10 @@ function showTitle(page) {
 function showEntity(page, entity) {
   function f() {
     log("Showing page "+page+", entity "+entity);
-    if(ex.currentPage && page == ex.currentPage._no)
+    if(currentPage && page == currentPage.no)
       scrollToEntity(entity);
     else loadPage(page, entity);
-    if(page > 0) markNavigationPage(page);
+    markNavigationPage(page);
     showTitle(page);
   }
   if(ex.global) f(); else queuedInit = f;
@@ -232,6 +262,7 @@ function showEntity(page, entity) {
 
 $(function() {
 
+  log("Extradoc Explorer starting");
   var navigation = $("#navigation");
   var content = $("#content");
   $("<div id=\"separator\"></div>").insertAfter($("#navigation")).draggable({

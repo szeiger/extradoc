@@ -26,7 +26,7 @@ var linkKeys = {
 
 var mapKeys = { "throws": true };
 
-ex = { currentPage: null };
+ex = { };
 
 function getEntityName(e) {
   if(e.name) return e.name;
@@ -43,17 +43,14 @@ ex.load = function(pageNo, ok, err) {
     dataType: 'text',
     success: function(data) {
       eval("window.extradoc.currentPage = "+data);
-      ex.resolvePage(ex.currentPage, pageNo);
-      ok(ex.currentPage);
+      var p = ex.currentPage;
+      p._no = pageNo;
+      for(var i=0; i<p.length; i++) resolveObject(p[i], null);
+      delete ex.currentPage;
+      ok(p);
     },
     error: err
   });
-};
-
-ex.resolvePage = function(page, pageNo) {
-  ex.currentPage = page;
-  page._no = pageNo;
-  for(var i=0; i<page.length; i++) resolveObject(page[i], null);
 };
 
 function resolveObject(o, name) {
