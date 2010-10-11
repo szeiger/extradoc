@@ -133,12 +133,33 @@ function resolveArray(o, name) {
   }
 }
 
+function resolveGlobal(global) {
+  global.pageToPageInfo = [];
+  global.qnToPageInfo = {};
+  for(var i=0; i<global.packages.length; i++) {
+    var pck = global.packages[i];
+    var pi = { p: pck.p, "in": pck["in"], qn: pck.n, k: "p" };
+    global.qnToPageInfo[pck.n] = pi;
+    global.pageToPageInfo[pck.p] = pi;
+    if(pck.e) {
+      for(var j=0; j<pck.e.length; j++) {
+        var n = pck.n + "." + global.names[pck.e[j].p+",0"];
+        if(pck.e[j].k == "b") n += "$";
+        pi = { p: pck.e[j].p, "in": pck.p, qn: n, k: pck.e[j].k };
+        global.qnToPageInfo[n] = pi;
+        global.pageToPageInfo[pck.e[j].p] = pi;
+      }
+    }
+  }
+}
+
 ex.loadGlobal = function(ok, err) {
   $.ajax({
     url: 'global.json',
     dataType: 'text',
     success: function(data) {
       eval("window.extradoc.global = "+data);
+      resolveGlobal(ex.global);
       ok(ex.global);
     },
     error: err

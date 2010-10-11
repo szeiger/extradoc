@@ -18,11 +18,12 @@ body {
 /* Header *******************************************************************/
 
 #header {
+  width: 100%;
   font-size: 14px;
   line-height: 21px;
   margin: 0;
-  padding: 3px 6px;
-  background-color: black;
+  padding: 0;
+  background-color: #303030;
   background-image: -webkit-gradient(
     linear,
     left bottom,
@@ -35,17 +36,130 @@ body {
     #505050 0%,
     #303030 100%
   );
-  border-bottom: 1px solid black;
   color: white;
-  height: 1.5em;
-  font-weight: bold;
+  height: 28px;
   z-index: 100;
+  white-space: nowrap;
 }
 
-#header h1 {
-  margin: 0;
-  font-size: 1em;
-  font-weight: inherit;
+#leftTitle {
+  padding: 3px 12px 3px 6px;
+  border-right: 1px solid black;
+  width: 1px;
+  border-bottom: 1px solid black;
+}
+
+#mainTitle {
+  font-weight: bold;
+  padding: 3px 12px 3px 12px;
+  border-left: 1px solid #606060;
+  border-bottom: 1px solid black;
+}
+
+#mainTitle a {
+  color: inherit;
+  font-weight: normal;
+  text-decoration: none;
+}
+
+#mainTitle a:active, #mainTitle a:hover {
+  text-decoration: underline;
+}
+
+#mainTitle div {
+  -webkit-border-radius: 7px;
+  -moz-border-radius: 7px;
+  border-radius: 7px;
+  width: 14px;
+  height: 14px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 14px;
+  color: black;
+  background-color: #e8e8e8;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #d0d0d0), color-stop(1, #f0f0f0));
+  background-image: -moz-linear-gradient(center bottom, #d0d0d0 0%, #f0f0f0 100%);
+  float: left;
+  margin-top: 4px;
+  margin-right: 8px;
+}
+
+#tabs {
+  padding: 6px 0 0 0;
+  width: 1px;
+  border: 0;
+}
+
+#tabs table {
+  height: 22px;
+}
+
+#tabs td.tab {
+  border-left: 1px solid #808080;
+  border-top: 1px solid #808080;
+  border-right: 1px solid #808080;
+  border-bottom: 1px solid black;
+  -webkit-border-top-left-radius: 6px;
+  -moz-border-radius-topleft: 6px;
+  border-top-left-radius: 6px;
+  -webkit-border-top-right-radius: 6px;
+  -moz-border-radius-topright: 6px;
+  border-top-right-radius: 6px;
+}
+
+#tabs td.tab a, #tabs td.tab span {
+  padding: 0 12px;
+  color: inherit;
+  text-decoration: none;
+  display: block;
+  height: 100%;
+  line-height: 18px;
+}
+
+#tabs td.tab span {
+  display: none;
+}
+
+#tabs td.tab a:hover, #tabs td.tab a:active {
+  text-decoration: underline
+}
+
+#tabs td.selected {
+  border-left: 1px solid white;
+  border-top: 1px solid white;
+  border-right: 1px solid white;
+  border-bottom: 1px solid #e8e8e8;
+  color: black;
+  background: #e8e8e8;
+  background-image: -webkit-gradient(
+    linear,
+    left bottom,
+    left top,
+    color-stop(0, #e8e8e8),
+    color-stop(1, #ffffff)
+  );
+  background-image: -moz-linear-gradient(
+    center bottom,
+    #e8e8e8 0%,
+    #ffffff 100%
+  );
+}
+
+#tabs td.selected a {
+  display: none;
+}
+
+#tabs td.selected span {
+  display: block;
+}
+
+#tabs td.filler {
+  min-width: 6px;
+  border-bottom: 1px solid black;
+}
+
+#tabs td.filler_right {
+  min-width: 28px;
 }
 
 /* Navigation Area **********************************************************/
@@ -58,7 +172,6 @@ body {
   width: 300px;
   overflow: auto;
   background-color: #fafafa;
-  z-index: 0;
 }
 
 #navigation ul.packages {
@@ -143,9 +256,6 @@ body {
   display: block;
   padding: 6px 0;
   margin: 0;
-  /*border-left: 1px solid #cdcdcd;
-  border-right: 1px solid #cdcdcd;
-  padding: 5px;*/
 }
 
 #navigation ul.packages > li > table tr.package td {
@@ -225,16 +335,39 @@ body {
   text-decoration: underline;
 }
 
+/* Separator ****************************************************************/
+
 #separator {
   position: absolute;
   top: 28px;
   left: 300px;
   bottom: 0;
-  width: 4px;
+  width: 6px;
   background: transparent;
-  z-index: 1000;
+  z-index: 1;
   cursor: e-resize;
   border-left: 1px solid #a0a0a0;
+}
+
+#separator div {
+  background: #f0f0f0;
+  background-image: -webkit-gradient(linear, left top, right top, color-stop(0, #f0f0f0), color-stop(1, #ffffff));
+  background-image: -moz-linear-gradient(left center, #f0f0f0 0%, #ffffff 100%);
+  position: absolute;
+  left: -1px;
+  width: 100%;
+  top: 50px;
+  height: 50px;
+  border-left: 1px solid #a0a0a0;
+  border-top: 1px solid #c0c0c0;
+  border-right: 1px solid #c0c0c0;
+  border-bottom: 1px solid #c0c0c0;
+  -webkit-border-top-right-radius: 6px;
+  -moz-border-radius-topright: 6px;
+  border-top-right-radius: 6px;
+  -webkit-border-bottom-right-radius: 6px;
+  -moz-border-radius-bottomright: 6px;
+  border-bottom-right-radius: 6px;
 }
 
 /* Content Area *************************************************************/
@@ -247,6 +380,13 @@ body {
   bottom: 0;
   right: 0;
   overflow: auto;
+}
+
+ol.page {
+  padding-right: 12px;
+}
+
+ol.page > li {
 }
 
 table.object {

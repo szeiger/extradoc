@@ -1,4 +1,8 @@
 var ex = window.extradoc;
+var baseTitle = "Extradoc Explorer";
+var currentTab;
+var currentPage;
+var currentEntity = 0;
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -26,10 +30,75 @@ function t(t, p) {
 function scrollToEntity(entity) {
   var content = $("#content");
   var pos;
-  if(entity >= 0) {
+  if(entity > 0) {
     pos = $($("ol.page > li")[entity]).position().top + content.scrollTop() - 6;
   } else pos = 0;
   content.scrollTop(pos);
+};
+
+function decodeHash(hash) {
+  var params = {};
+  if(!hash || hash.charAt(0) != '!') return params;
+  var parts = hash.replace(/^!/, "").split("&");
+  for(var i=0; i<parts.length; i++) {
+    var kv = parts[i].split("=");
+    if(kv.length == 2) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+  }
+  return params;
+}
+
+function encodeHash(params) {
+  var hash = "!";
+  for(var k in params) {
+    if(params.hasOwnProperty(k)) {
+      if(hash.length != 1) hash += "&"
+      hash += encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+    }
+  }
+  return hash.length == 1 ? "" : hash;
+}
+
+function showTitle(page) {
+  document.title = page > 0 ? (ex.global.names[page+",0"]+" - "+baseTitle) : baseTitle;
+  var j = $("#mainTitle").empty();
+  if(page > 0) {
+    var first = true;
+    function f(p) {
+      var pi = ex.global.pageToPageInfo[p];
+      if(p === page) {
+        t(kindMarkers[pi.k][0], e("div", null, j[0]));
+      }
+      var parent = pi && pi["in"];
+      log("page: "+p+", parent: "+parent);
+      if(parent && parent != p) f(parent);
+      if(first) first = false;
+      else t(" . ", j[0]);
+      if(p === page) t(ex.global.names[p+",0"], j[0]);
+      else {
+        var aE = e("a", { href: "#" }, j[0]);
+        t(ex.global.names[p+",0"], aE);
+        aE.onclick = function() { goToEntity(pi.p, -1); return false; }
+      }
+    }
+    f(page);
+  }
+}
+
+function activateTab(view) {
+  var id = "tab_"+view;
+  if(currentTab) {
+    if(currentTab == view) return;
+    $("#tab_"+currentTab).toggleClass("selected", false);
+  }
+  currentTab = view;
+  $("#tab_"+view).toggleClass("selected", true);
+}
+
+var kindMarkers = {
+  b: ["O", "object"],
+  c: ["C", "class"],
+  t: ["T", "trait"],
+  p: ["P", "package"]
 };
 
 
@@ -91,7 +160,7 @@ function createChildDOM(o) {
     var aE = e("a", { href: "#" });
     aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
     if(o[0] == currentPage.no) t(currentPage.model[o[1]].name, aE);
-    else t("["+o[0]+", "+o[1]+"]", aE);
+    else t(ex.global.names[o[0]+","+o[1]] + "\u2197 ", aE);
     return aE;
   }
   else if(o.hasOwnProperty("length")) {
@@ -125,14 +194,6 @@ var selectedNavigationPage = null;
 function createNavigationDOM() {
   var packages = ex.global.packages;
   var ulE = e("ul", { "class": "packages" });
-  function markerFor(is) {
-    switch(is) {
-      case 'b': return ["O", "object"];
-      case 'c': return ["C", "class"];
-      case 't': return ["T", "trait"];
-      case 'p': return ["P", "package"];
-    }
-  }
   function createPackageDOM(p) {
     var liE = e("li", null, ulE);
     var aE = e("a", { href: "#" }, e("span", null, liE));
@@ -151,7 +212,7 @@ function createNavigationDOM() {
           var pageNo = i == -1 ? p.p : p.e[i].p;
           var trE = e("tr", i == -1 ? { "class": "package" } : null, tableE)
           var name = i == -1 ? p.n : ex.global.names[p.e[i].p+",0"];
-          var marker = markerFor(i == -1 ? "p" : p.e[i].k);
+          var marker = kindMarkers[i == -1 ? "p" : p.e[i].k];
           t(marker[0], e("div", null, e("th", { "class": marker[1] }, trE)));
           var aE = e("a", { href: "#" }, e("td", null, trE));
           aE.onclick = function() { goToEntity(pageNo, -1); return false; };
@@ -202,7 +263,6 @@ Page.prototype.getModelDOM = function() {
 };
 
 var pageCache = new Cache(10);
-var currentPage;
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -210,9 +270,16 @@ var currentPage;
 //////////////////////////////////////////////////////////////////////////////
 
 var queuedInit = null;
-var baseTitle = "Extradoc Explorer";
 
-function goToEntity(page, entity) { $.history.load("e/"+page+"/"+entity); }
+function goToEntity(page, entity, view) {
+  if(!page && page !== 0) page = currentPage ? currentPage.no : 0;
+  if(!entity && entity !== 0) entity = currentEntity;
+  if(!view) view = currentTab;
+  var params = { t: ex.global.pageToPageInfo[page].qn };
+  if(entity && entity != -1) params.e = entity;
+  if(view && view != "page") params.v = view;
+  $.history.load(encodeHash(params));
+}
 
 function loadPage(no, entity) {
   $("#content").empty().append("Loading and rendering page "+no+"...");
@@ -244,18 +311,18 @@ function loadPage(no, entity) {
   }, 0);
 }
 
-function showTitle(page) {
-  document.title = page > 0 ? (ex.global.names[page+",0"]+" - "+baseTitle) : baseTitle;
-}
-
-function showEntity(page, entity) {
+function showEntity(page, entity, view) {
   function f() {
-    log("Showing page "+page+", entity "+entity);
+    if(!view) view = "page";
+    if(!page) page = 0;
+    else if(typeof page === "string") page = (ex.global.qnToPageInfo[page] || {p:0}).p;
+    log("Showing page "+page+", entity "+entity+", view "+view);
     if(currentPage && page == currentPage.no)
       scrollToEntity(entity);
     else loadPage(page, entity);
     markNavigationPage(page);
     showTitle(page);
+    activateTab(view);
   }
   if(ex.global) f(); else queuedInit = f;
 }
@@ -265,29 +332,55 @@ $(function() {
   log("Extradoc Explorer starting");
   var navigation = $("#navigation");
   var content = $("#content");
-  $("<div id=\"separator\"></div>").insertAfter($("#navigation")).draggable({
+
+  var inClick = false;
+  var rememberedPos = 300;
+  $('<div id="separator"><div></div></div>').insertAfter(navigation).draggable({
     axis: "x",
     containment: "parent",
+    cursor: "e-resize",
+    snap: "body",
     drag: function(event, ui) {
-      navigation.css("width", ui.position.left);
-      content.css("left", ui.position.left+1);
+      var pos = ui.position.left;
+      navigation.css("width", pos);
+      content.css("left", pos+1);
+      inClick = false;
+      if(pos > 20) rememberedPos = pos;
     }
   });
+  var separator = $("#separator");
+  $("#separator div").mousedown(function() {
+    inClick = true;
+    return true;
+  }).click(function() {
+    if(!inClick) return false;
+    inClick = false;
+    var pos = separator.css("left") !== "0px" ? 0 : rememberedPos;
+    separator.css("left", pos);
+    navigation.css("width", pos);
+    content.css("left", pos+1);
+  }).attr("title", "Toggle Sidebar");
 
-  $("#navigation").empty().append("Loading navigation...");
+  navigation.empty().append("Loading navigation...");
   ex.loadGlobal(function(global) {
-      $("#navigation").empty().append(createNavigationDOM());
+      navigation.empty().append(createNavigationDOM());
       if(queuedInit) { queuedInit(); queuedInit = null; }
     }, function(XMLHttpRequest, textStatus, errorThrown) {
       var errmsg = "Error loading page: "+textStatus+"; "+errorThrown;
       log(errmsg);
-      $("#navigation").empty().append(errmsg);
+      navigation.empty().append(errmsg);
     });
 
+  $("#tabs td.tab").each(function() {
+    var view = this.id.replace(/^tab_/, "");
+    this.onclick = function() { goToEntity(null, null, view); return false; };
+  });
+
   $.history.init(function(hash) {
-    var res;
-    if(hash == "") showEntity(0, -1);
-    else if(res = hash.match(/^e\/(.*)\/(.*)$/)) showEntity(parseInt(res[1]), parseInt(res[2]));
-  }, { unescape: "/" });
+    var params = decodeHash(hash);
+    showEntity(params.t, params.e || -1, params.v);
+  }, { unescape: true });
+
+  $("#leftTitle").text(baseTitle);
 
 });

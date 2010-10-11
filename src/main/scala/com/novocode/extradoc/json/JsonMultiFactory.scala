@@ -157,6 +157,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
         val jo = new JObject
         jo += "p" -> no
         jo += "n" -> j("qName").get.asInstanceOf[String]
+        j("inTemplate") foreach { case l: Link => jo += "in" -> pages(l.target).no }
         j("templates") foreach { case a: JArray =>
           val children = a.values collect { case l: Link => (l.target, allModels(l.target)) }
           val tlChildren = children map { case (ord, j: JObject) =>
