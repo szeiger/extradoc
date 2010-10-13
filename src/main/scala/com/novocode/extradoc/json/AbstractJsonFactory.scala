@@ -13,6 +13,7 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
   val doInline = true
   val typeEntitiesAsHtml = false
   val compactFlags = false
+  val removeSimpleBodyDocs = false
 
   def prepareModel(universe: Universe) = {
     println("Building JSON model")
@@ -34,6 +35,7 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     val builder = new JsonBuilder[Link] {
       val typeEntitiesAsHtml = self.typeEntitiesAsHtml
       val compactFlags = self.compactFlags
+      val removeSimpleBodyDocs = self.removeSimpleBodyDocs
       def global[T <: Entity](e: T)(f: T => JBase) = globalEntityOrdinals.get(EntityHash(e)) match {
         case Some(ord) => Link(ord)
         case None =>

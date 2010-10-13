@@ -1,8 +1,9 @@
 var ex = window.extradoc;
 var baseTitle = "Extradoc Explorer";
-var currentTab;
-var currentPage;
+var defaultView = "model";
+var currentTab, currentPage;
 var currentEntity = 0;
+var contentJ, contentPartJs, contentCurrentJ;
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -28,12 +29,11 @@ function t(t, p) {
 }
 
 function scrollToEntity(entity) {
-  var content = $("#content");
   var pos;
   if(entity > 0) {
-    pos = $($("ol.page > li")[entity]).position().top + content.scrollTop() - 6;
+    pos = $($("ol.page > li")[entity]).position().top + contentCurrentJ.scrollTop() - 6;
   } else pos = 0;
-  content.scrollTop(pos);
+  contentCurrentJ.scrollTop(pos);
 };
 
 function decodeHash(hash) {
@@ -65,7 +65,7 @@ function showTitle(page) {
     var first = true;
     function f(p) {
       var pi = ex.global.pageToPageInfo[p];
-      if(p === page) {
+      if(p === page && pi) {
         t(kindMarkers[pi.k][0], e("div", null, j[0]));
       }
       var parent = pi && pi["in"];
@@ -94,93 +94,24 @@ function activateTab(view) {
   $("#tab_"+view).toggleClass("selected", true);
 }
 
+function showPart(view, e) {
+  contentCurrentJ = contentPartJs[view];
+  if(e) contentCurrentJ.empty().append(e);
+  for(var k in contentPartJs)
+    if(contentPartJs.hasOwnProperty(k))
+      contentPartJs[k].css("display", k === view ? "block" : "none");
+}
+
+function showMessage(msg) {
+  contentPartJs.msg.text(msg);
+  showPart("msg");
+}
+
 var kindMarkers = {
   b: ["O", "object"],
   c: ["C", "class"],
   t: ["T", "trait"],
   p: ["P", "package"]
-};
-
-
-//////////////////////////////////////////////////////////////////////////////
-// Create DOM for content area
-//////////////////////////////////////////////////////////////////////////////
-
-function createObjectDOM(o, no) {
-  var tableE = e("table", { "class": "object", cellspacing: 0, cellpadding: 0 });
-  var tbodyE = e("tbody", null, tableE);
-  if(o._isEntity) {
-    var trE = e("tr", null, tbodyE);
-    var thE = e("th", { colspan: 2, "class": "entityhead" }, trE);
-    t(o.qName, thE);
-  }
-  for(var k in o) {
-    if(!o.hasOwnProperty(k) || k[0] == "_") continue;
-    var trE = e("tr", null, tbodyE);
-    var thE = e("th", null, trE);
-    var tdE = e("td", null, trE);
-    t(k, thE);
-    if(k == "sourceUrl") e("a", { href: o[k] }, tdE).appendChild(t(o[k]));
-    else tdE.appendChild(createChildDOM(o[k]));
-  }
-  return tableE;
-}
-
-function createArrayDOM(o) {
-  var olE = e("ol", { start: 0, "class": "array" });
-  for(var i=0; i<o.length; i++) {
-    var liE = e("li", null, olE);
-    liE.appendChild(createChildDOM(o[i]));
-  }
-  return olE;
-}
-
-function createHtmlDOM(o) {
-  var divE = e("div", { "class": "html" });
-  $(divE).append(o._html);
-  return divE;
-}
-
-function createXNameDOM(o) {
-  var spanE = e("span");
-  $(spanE).append(o._xname);
-  $("a", spanE).each(function(idx) {
-    this.href = "##";
-    this.onclick = function() { goToEntity(o._refs[idx][0], o._refs[idx][1]); return false; }
-  });
-  return spanE;
-}
-
-function createChildDOM(o) {
-  var tp = typeof(o);
-  if(tp == "string") return t(o);
-  else if(tp == "number") return t(o);
-  else if(tp == "boolean") return t(o);
-  else if(o._isLink) {
-    var aE = e("a", { href: "#" });
-    aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
-    if(o[0] == currentPage.no) t(currentPage.model[o[1]].name, aE);
-    else t(ex.global.names[o[0]+","+o[1]] + "\u2197 ", aE);
-    return aE;
-  }
-  else if(o.hasOwnProperty("length")) {
-    if(o.length > 0) return createArrayDOM(o);
-    else return t("[]");
-  }
-  else if(o.hasOwnProperty("_html")) return createHtmlDOM(o);
-  else if(o.hasOwnProperty("_xname")) return createXNameDOM(o);
-  else return createObjectDOM(o);
-}
-
-function createEntityDOM(entity, no) { return createObjectDOM(entity, no); }
-
-function createPageDOM(page) {
-  var olE = e("ol", { "class": "page", start: 0 });
-  for(var i=0; i<page.length; i++) {
-    var liE = e("li", null, olE);
-    liE.appendChild(createEntityDOM(page[i], i));
-  }
-  return olE;
 };
 
 
@@ -255,21 +186,128 @@ function Page(model) {
   this.no = model._no;
 }
 
-Page.prototype.getModelDOM = function() {
-  if(this.modelDOM) return this.modelDOM;
-  this.modelDOM = createPageDOM(this.model);
-  delete this.model;
-  return this.modelDOM;
-};
+Page.prototype.getDOM = function(view) {
+  if(view == "model") return this.getModelDOM();
+  else return this.getPageDOM();
+}
 
 var pageCache = new Cache(10);
 
 
 //////////////////////////////////////////////////////////////////////////////
-// Main program
+// Create DOM for Page tab
 //////////////////////////////////////////////////////////////////////////////
 
-var queuedInit = null;
+Page.prototype.getPageDOM = function() {
+  if(this.pageDOM) return this.pageDOM;
+  this.pageDOM = t("Page view not implemented yet. Use Model view instead.");
+  return this.pageDOM;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Create DOM for Model tab
+//////////////////////////////////////////////////////////////////////////////
+
+Page.prototype.getModelDOM = function() {
+  function createObjectDOM(o, no) {
+    var tableE = e("table", { "class": "object", cellspacing: 0, cellpadding: 0 });
+    var tbodyE = e("tbody", null, tableE);
+    if(o._isEntity) {
+      var trE = e("tr", null, tbodyE);
+      var thE = e("th", { colspan: 2, "class": "entityhead" }, trE);
+      t(o.name, e("span", null, thE));
+      t(o.qName, thE);
+    }
+    var is = null;
+    if(o._isEntity) {
+      for(var k in o) {
+        if(o.hasOwnProperty(k) && k.match(/^is/))
+          if(is) is += ", "+k.substring(2); else is = k.substring(2);
+      }
+    }
+    if(is) {
+      var trE = e("tr", null, tbodyE);
+      t("is...", e("th", null, trE));
+      t(is, e("td", null, trE));
+    }
+    for(var k in o) {
+      if(!o.hasOwnProperty(k) || o._isEntity &&
+        (k[0] === "_" || k === "qName" || k === "name" || k.match(/^is/))) continue;
+      var trE = e("tr", null, tbodyE);
+      var thE = e("th", null, trE);
+      var tdE = e("td", null, trE);
+      t(k, thE);
+      if(k == "sourceUrl") e("a", { href: o[k] }, tdE).
+        appendChild(t("..."+o[k].substring(ex.global.settings.docsourceurl.length)));
+      else tdE.appendChild(createChildDOM(o[k]));
+    }
+    return tableE;
+  }
+
+  function createChildDOM(o) {
+    var tp = typeof(o);
+    if(tp == "string") return t(o);
+    else if(tp == "number") return t(o);
+    else if(tp == "boolean") return t(o);
+    else if(o._isLink) {
+      var spanE = e("span");
+      var aE = e("a", { href: "#" }, spanE);
+      aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
+      if(o[0] == currentPage.no) t(currentPage.model[o[1]].name, aE);
+      else t(ex.global.names[o[0]+","+o[1]], aE);
+      t((o[0] == currentPage.no ? "\u2192 " : "\u2197 ")+o[0]+", "+o[1], e("span", { "class": "entityno" }, spanE));
+      return spanE;
+    }
+    else if(o.hasOwnProperty("length")) {
+      if(o.length > 0) {
+        var olE = e("ol", { start: 0, "class": "array" });
+        for(var i=0; i<o.length; i++) {
+          var liE = e("li", null, olE);
+          liE.appendChild(createChildDOM(o[i]));
+        }
+        return olE;
+      }
+      else return t("[]");
+    }
+    else if(o.hasOwnProperty("_html")) {
+      var divE = e("div", { "class": "html" });
+      $(divE).append(o._html);
+      return divE;
+    }
+    else if(o.hasOwnProperty("_xname")) {
+      var spanE = e("span");
+      $(spanE).append(o._xname);
+      $("a", spanE).each(function(idx) {
+        this.href = "##";
+        this.onclick = function() { goToEntity(o._refs[idx][0], o._refs[idx][1]); return false; }
+      });
+      return spanE;
+    }
+    else return createObjectDOM(o);
+  }
+
+  function createModelDOM(page) {
+    var divE = e("div");
+    t("p"+page._no+".json: "+(page.length == 1 ? "1 entity, " : (page.length+" entities, "))+
+      (page._bytes/1024).toFixed(0)+" kB (+ "+(ex.global._bytes/1024).toFixed(0)+" kB global)", e("h1", null, divE));
+    var olE = e("ol", { "class": "page", start: 0 }, divE);
+    for(var i=0; i<page.length; i++) {
+      var liE = e("li", null, olE);
+      liE.appendChild(createObjectDOM(page[i], i));
+    }
+    return divE;
+  };
+
+  if(this.modelDOM) return this.modelDOM;
+  this.modelDOM = createModelDOM(this.model);
+  return this.modelDOM;
+};
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Main program
+//////////////////////////////////////////////////////////////////////////////
 
 function goToEntity(page, entity, view) {
   if(!page && page !== 0) page = currentPage ? currentPage.no : 0;
@@ -277,19 +315,19 @@ function goToEntity(page, entity, view) {
   if(!view) view = currentTab;
   var params = { t: ex.global.pageToPageInfo[page].qn };
   if(entity && entity != -1) params.e = entity;
-  if(view && view != "page") params.v = view;
+  if(view && view != defaultView) params.v = view;
   $.history.load(encodeHash(params));
 }
 
-function loadPage(no, entity) {
-  $("#content").empty().append("Loading and rendering page "+no+"...");
-  $(window).scrollTop(0);
+function loadPage(no, entity, view) {
+  showMessage("Loading page "+no+"...");
   setTimeout(function() {
     var cached = pageCache.getItem("p"+no);
     if(cached) {
       log("Retrieved page from cache");
       currentPage = cached;
-      $("#content").empty().append(cached.getModelDOM());
+      showPart(view, cached.getDOM(view));
+      scrollToEntity(entity);
     } else {
       log("Loading data...");
       var t0 = (new Date).getTime();
@@ -299,57 +337,73 @@ function loadPage(no, entity) {
           var page = new Page(model);
           currentPage = page;
           pageCache.setItem("p"+no, page);
-          $("#content").empty().append(page.getModelDOM());
+          showPart(view, page.getDOM(view));
           log("Rendered in "+((new Date).getTime()-t0)+"ms");
           scrollToEntity(entity);
         }, function(XMLHttpRequest, textStatus, errorThrown) {
           var errmsg = "Error loading page: "+textStatus+"; "+errorThrown;
           log(errmsg);
-          $("#content").empty().append(errmsg);
+          showMessage(errmsg);
         });
     }
   }, 0);
 }
 
-function showEntity(page, entity, view) {
-  function f() {
-    if(!view) view = "page";
-    if(!page) page = 0;
-    else if(typeof page === "string") page = (ex.global.qnToPageInfo[page] || {p:0}).p;
-    log("Showing page "+page+", entity "+entity+", view "+view);
-    if(currentPage && page == currentPage.no)
-      scrollToEntity(entity);
-    else loadPage(page, entity);
-    markNavigationPage(page);
-    showTitle(page);
-    activateTab(view);
+function showEntity(params) {
+  var page = 0;
+  if(params.hasOwnProperty("p")) {
+    page = parseInt(params.p);
+  } else if(params.hasOwnProperty("t")) {
+    page = (ex.global.qnToPageInfo[params.t] || {p:0}).p;
   }
-  if(ex.global) f(); else queuedInit = f;
+  var entity = params.e || -1;
+  var view = params.v;
+  if(!view) view = defaultView;
+  log("Showing page "+page+", entity "+entity+", view "+view);
+  if(currentPage && page == currentPage.no && currentTab == view)
+    scrollToEntity(entity);
+  else loadPage(page, entity, view);
+  markNavigationPage(page);
+  showTitle(page);
+  activateTab(view);
 }
 
 $(function() {
 
   log("Extradoc Explorer starting");
   var navigation = $("#navigation");
-  var content = $("#content");
+  contentJ = $("#content");
+  contentPartJs = {
+    page: $("#content_page"),
+    model: $("#content_model"),
+    source: $("#content_source"),
+    msg: $("#content_msg")
+  };
 
   var inClick = false;
   var rememberedPos = 300;
-  $('<div id="separator"><div></div></div>').insertAfter(navigation).draggable({
+  var separator = $("#separator").draggable({
     axis: "x",
     containment: "parent",
     cursor: "e-resize",
     snap: "body",
     drag: function(event, ui) {
       var pos = ui.position.left;
-      navigation.css("width", pos);
-      content.css("left", pos+1);
+      syncSeparator(pos);
       inClick = false;
       if(pos > 20) rememberedPos = pos;
     }
   });
-  var separator = $("#separator");
-  $("#separator div").mousedown(function() {
+  var separatorDiv = $("div", separator);
+  var sepBorderColor = separator.css("border-left-color");
+  var sepHandleColor = separatorDiv.css("background-color");
+  function syncSeparator(pos) {
+    navigation.css("width", pos);
+    contentJ.css("left", pos+1);
+    separator.css("border-left-color", pos ? sepBorderColor : "transparent");
+    separatorDiv.css("border-left-color", pos ? sepBorderColor : sepHandleColor);
+  }
+  separatorDiv.mousedown(function() {
     inClick = true;
     return true;
   }).click(function() {
@@ -357,30 +411,29 @@ $(function() {
     inClick = false;
     var pos = separator.css("left") !== "0px" ? 0 : rememberedPos;
     separator.css("left", pos);
-    navigation.css("width", pos);
-    content.css("left", pos+1);
-  }).attr("title", "Toggle Sidebar");
+    syncSeparator(pos);
+  });
+
+  function globalReady(global) {
+    if(global.settings.doctitle) {
+      baseTitle = global.settings.doctitle;
+      if(global.settings.docversion) baseTitle += " " + global.settings.docversion;
+    }
+    navigation.empty().append(createNavigationDOM());
+    $("#tabs td.tab").each(function() {
+      var view = this.id.replace(/^tab_/, "");
+      this.onclick = function() { goToEntity(null, null, view); return false; };
+    });
+    $.history.init(function(hash) { showEntity(decodeHash(hash)); }, { unescape: true });
+    var aE = e("a", { href: "#" }, $("#leftTitle")[0]);
+    aE.onclick = function() { goToEntity(0, -1, defaultView); return false; }
+    t(baseTitle, aE);
+  }
 
   navigation.empty().append("Loading navigation...");
-  ex.loadGlobal(function(global) {
-      navigation.empty().append(createNavigationDOM());
-      if(queuedInit) { queuedInit(); queuedInit = null; }
-    }, function(XMLHttpRequest, textStatus, errorThrown) {
-      var errmsg = "Error loading page: "+textStatus+"; "+errorThrown;
+  ex.loadGlobal(globalReady, function(XMLHttpRequest, textStatus, errorThrown) {
+      var errmsg = "Error loading navigation: "+textStatus+"; "+errorThrown;
       log(errmsg);
       navigation.empty().append(errmsg);
     });
-
-  $("#tabs td.tab").each(function() {
-    var view = this.id.replace(/^tab_/, "");
-    this.onclick = function() { goToEntity(null, null, view); return false; };
-  });
-
-  $.history.init(function(hash) {
-    var params = decodeHash(hash);
-    showEntity(params.t, params.e || -1, params.v);
-  }, { unescape: true });
-
-  $("#leftTitle").text(baseTitle);
-
 });

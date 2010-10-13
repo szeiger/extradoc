@@ -21,12 +21,27 @@ from Scala 2.8.0 is on your path. Or run the main class
 com.novocode.extradoc.ExtraDoc in some other way.
 
 Example: Building scaladoc.json for the Scala library (run from the base dir
-of the Scala source code):
-  extradoc -doc-format:json -P:continuations:enable src\actors src\library\scala src\swing src\continuations\library
+of the Scala source code; put everything on one line):
+
+  extradoc -doc-format:json -P:continuations:enable \
+    src\actors src\library\scala src\swing src\continuations\library
 
 For Scala 2.8.0, this results in a JSON file of 80 MB which compresses very
 nicely down to 2 MB (with 7zip). Extradoc requires quite a bit of memory to
 build its JSON models. You should have a heap size of at least 1.5 GB (2 GB
 recommended) to build the Scala library documentation in JSON format.
 
-See LICENSE.txt for licensing conditions (BSD-style).
+Example: Building an Extradoc Explorer site for the Scala library, with a
+proper title and linked sources (assuming the output directory doc-test
+already exists; put everything on one line):
+
+  extradoc -doc-format:explorer -P:continuations:enable \
+    -doc-title "Scala Library" \
+    -doc-version 2.8.0 \
+    -doc-source-url \
+    http://lampsvn.epfl.ch/trac/scala/browser/scala/tags/R_2_8_0_final \
+    -d doc-test \
+    src\actors src\library\scala src\swing src\continuations\library
+
+See LICENSE.txt for licensing conditions (BSD-style). Dependencies have their
+own licenses (BSD or MIT).

@@ -15,6 +15,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
 
   override val typeEntitiesAsHtml = true
   override val compactFlags = true
+  override val removeSimpleBodyDocs = true
 
   case class Page(no: Int, main: Int) {
     val objects = new mutable.HashSet[Int]
@@ -38,8 +39,14 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       zipWithIndex map { case (ord,idx) => (ord, Page(idx, ord))} toMap;
     def findPage(ord: Int, j: JBase): Option[Page] = j match {
       case j: JObject =>
+        val isPage = pages contains ord
+        val isPackage = j("isPackage").getOrElse(false) == true || j("is").getOrElse("").asInstanceOf[String].contains('p')
+        val isObject = j("isObject").getOrElse(false) == true || j("is").getOrElse("").asInstanceOf[String].contains('b')
+        val companionPage = j("companion") map { case l: Link => pages get l.target }
         // Don't map external packages to their parents
-        if(ord >= 0 && (j("isPackage").getOrElse(false) == true || j("is").getOrElse("").asInstanceOf[String].contains('p')) && !(pages contains ord)) None
+        if(ord >= 0 && isPackage && !isPage) None
+        // Map auto-generated case class companion objects without a separate page to their classes
+        else if(isObject && companionPage.isDefined && !isPage) companionPage.get
         else j("inTemplate") match {
           case Some(Link(target)) =>
             pages get target orElse (allModels get target flatMap (ch => findPage(target, ch)))
@@ -145,42 +152,60 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
         }
       }
     }
-    val pageObjects = pages.values map { p => (p.no, allModels(p.main)) }
-    val allPackages = pageObjects filter { case (_, j: JObject) =>
+    val pageObjects = pages.values map { p => (p.no, (allModels(p.main).asInstanceOf[JObject], p.main)) }
+    val allPackages = pageObjects filter { case (_, (j, _)) =>
       j("isPackage").getOrElse(false) == true || j("is").getOrElse("").asInstanceOf[String].contains('p')
     } toMap
-    val linearPackages = allPackages.toSeq sortBy { case (_, j: JObject) => j("qName").get.asInstanceOf[String] }
+    val linearPackages = allPackages.toSeq sortBy { case (_, (j, _)) => j("qName").get.asInstanceOf[String] }
     println("Writing global.json")
+    val processedTemplates = new mutable.HashSet[Int]
+    def processTemplates(jOrd: Int, j: JObject, jo: JObject) {
+      j("templates") foreach { case a: JArray =>
+        val children = a.values collect { case l: Link =>
+          (l.target, allModels(l.target))
+        } filter { case (_, j: JObject) =>
+          val up = j("inTemplate") collect { case l: Link => l.target } getOrElse -1
+          up == -1 || up == jOrd
+        }
+        val tlChildren = children map { case (ord, j: JObject) =>
+          val is = j("is").getOrElse("").asInstanceOf[String]
+          val kind =
+            if(j("isClass").getOrElse(false) == true || is.contains('c')) 'c'
+            else if(j("isTrait").getOrElse(false) == true || is.contains('t')) 't'
+            else if(j("isObject").getOrElse(false) == true || is.contains('b')) 'b'
+            else '_'
+          (ord, j, kind)
+        } filter { case (ord, _, kind) => (pages contains ord) && (kind != '_') } toSeq;
+        val sortedChildren = tlChildren sortBy { case (_, j: JObject, kind) =>
+          (j("qName").getOrElse("").asInstanceOf[String].toLowerCase, kind)
+        }
+        jo +?= "e" -> JArray(sortedChildren map { case (ord, chj, kind) =>
+          val ch = new JObject
+          ch += "p" -> pages(ord).no
+          ch += "k" -> kind.toString
+          if(!processedTemplates.contains(ord)) {
+            processedTemplates += ord
+            processTemplates(ord, chj, ch)
+          }
+          ch
+        })
+      }
+    }
     JsonWriter(siteRoot, "global.json") createObject { w =>
       w.write("names", JObject(globalNames), { _.target })
-      w.write("packages", JArray(linearPackages map { case (no, j: JObject) =>
+      w.write("packages", JArray(linearPackages map { case (no, (j: JObject, ord)) =>
         val jo = new JObject
         jo += "p" -> no
         jo += "n" -> j("qName").get.asInstanceOf[String]
         j("inTemplate") foreach { case l: Link => jo += "in" -> pages(l.target).no }
-        j("templates") foreach { case a: JArray =>
-          val children = a.values collect { case l: Link => (l.target, allModels(l.target)) }
-          val tlChildren = children map { case (ord, j: JObject) =>
-            val is = j("is").getOrElse("").asInstanceOf[String]
-            val kind =
-              if(j("isClass").getOrElse(false) == true || is.contains('c')) 'c'
-              else if(j("isTrait").getOrElse(false) == true || is.contains('t')) 't'
-              else if(j("isObject").getOrElse(false) == true || is.contains('b')) 'b'
-              else '_'
-            (ord, j, kind)
-          } filter { case (ord, _, kind) => (pages contains ord) && (kind != '_') } toSeq;
-          val sortedChildren = tlChildren sortBy { case (_, j: JObject, kind) =>
-            (j("qName").getOrElse("").asInstanceOf[String].toLowerCase, kind)
-          }
-          jo +?= "e" -> JArray(sortedChildren map { case (ord, _, kind) =>
-            val ch = new JObject
-            ch += "p" -> pages(ord).no
-            ch += "k" -> kind.toString
-            ch
-          })
-        }
+        processTemplates(ord, j, jo)
         jo
       }), { _.target })
+      val settings = new JObject
+      if(!universe.settings.doctitle.isDefault) settings += "doctitle" -> universe.settings.doctitle.value
+      if(!universe.settings.docversion.isDefault) settings += "docversion" -> universe.settings.docversion.value
+      if(!universe.settings.docsourceurl.isDefault) settings += "docsourceurl" -> universe.settings.docsourceurl.value
+      w.write("settings", settings, { _.target })
     }
   }
 }

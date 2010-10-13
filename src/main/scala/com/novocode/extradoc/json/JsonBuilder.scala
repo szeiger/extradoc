@@ -11,6 +11,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
 
   val typeEntitiesAsHtml: Boolean
   val compactFlags: Boolean
+  val removeSimpleBodyDocs: Boolean
 
   def global[T <: Entity](e: T)(f: T => JBase): Link
 
@@ -30,7 +31,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
     val ns = f(gen)
     val j = new JObject
     j +?= "_links" -> gen.links
-    j += "_html" -> gen.mkString(ns)
+    j += "_html" -> (if(ns == Text("no summary matey")) "" else gen.mkString(ns).trim)
     j
   }
 
@@ -42,8 +43,19 @@ abstract class JsonBuilder[Link : CanBeValue] {
 
   def createComment(c: Comment): (JObject, Map[String, JObject], Map[String, JObject]) = {
     val j = new JObject
-    j +?= "body" -> createBody(c.body)
-    j +?= "short" -> createInline(c.short)
+    val bodyDoc = createBody(c.body)
+    val bodyIsEmpty = (bodyDoc("_html") getOrElse "") == ""
+    val shortDoc = createInline(c.short)
+    val shortIsEmpty = (shortDoc("_html") getOrElse "") == ""
+    if(!shortIsEmpty) j += "short" -> shortDoc
+    if(removeSimpleBodyDocs) {
+      val bodyHtml = bodyDoc("_html").getOrElse("").asInstanceOf[String]
+      val shortHtml = shortDoc("_html").getOrElse("").asInstanceOf[String]
+      val bodyIsSimple = bodyHtml.startsWith("<p>") && bodyHtml.endsWith("</p>") &&
+        bodyHtml.substring(3, bodyHtml.length-4).trim == shortHtml
+      if(!bodyIsEmpty && (bodyDoc("_links").isDefined || shortDoc("_links").isDefined || !bodyIsSimple))
+        j += "body" -> bodyDoc
+    } else if(!bodyIsEmpty) j += "body" -> bodyDoc
     j +?= "authors" -> JArray(c.authors.map(createBody _))
     j +?= "see" -> JArray(c.see.map(createBody _))
     c.result foreach { b => j +?= "result" -> createBody(b) }

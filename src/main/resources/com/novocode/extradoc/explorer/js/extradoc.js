@@ -45,6 +45,7 @@ ex.load = function(pageNo, ok, err) {
       eval("window.extradoc.currentPage = "+data);
       var p = ex.currentPage;
       p._no = pageNo;
+      p._bytes = data.length;
       for(var i=0; i<p.length; i++) resolveObject(p[i], null);
       delete ex.currentPage;
       ok(p);
@@ -136,20 +137,23 @@ function resolveArray(o, name) {
 function resolveGlobal(global) {
   global.pageToPageInfo = [];
   global.qnToPageInfo = {};
+  function resolveE(e, parentN, parentP) {
+    if(!e) return;
+    for(var j=0; j<e.length; j++) {
+      var n = parentN + "." + global.names[e[j].p+",0"];
+      if(e[j].k == "b") n += "$";
+      pi = { p: e[j].p, "in": parentP, qn: n, k: e[j].k };
+      global.qnToPageInfo[n] = pi;
+      global.pageToPageInfo[e[j].p] = pi;
+      resolveE(e[j].e, n, e[j].p);
+    }
+  }
   for(var i=0; i<global.packages.length; i++) {
     var pck = global.packages[i];
     var pi = { p: pck.p, "in": pck["in"], qn: pck.n, k: "p" };
     global.qnToPageInfo[pck.n] = pi;
     global.pageToPageInfo[pck.p] = pi;
-    if(pck.e) {
-      for(var j=0; j<pck.e.length; j++) {
-        var n = pck.n + "." + global.names[pck.e[j].p+",0"];
-        if(pck.e[j].k == "b") n += "$";
-        pi = { p: pck.e[j].p, "in": pck.p, qn: n, k: pck.e[j].k };
-        global.qnToPageInfo[n] = pi;
-        global.pageToPageInfo[pck.e[j].p] = pi;
-      }
-    }
+    resolveE(pck.e, pck.n, pck.p);
   }
 }
 
@@ -159,6 +163,7 @@ ex.loadGlobal = function(ok, err) {
     dataType: 'text',
     success: function(data) {
       eval("window.extradoc.global = "+data);
+      ex.global._bytes = data.length;
       resolveGlobal(ex.global);
       ok(ex.global);
     },
