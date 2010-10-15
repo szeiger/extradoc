@@ -32,6 +32,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       copyResource(p, "js/jquery-1.4.2.min.js")
       copyResource(p, "js/jquery-ui-1.8.5.custom.min.js")
       copyResource(p, "js/jquery.history.js")
+      copyResource(p, "images/ajax-loader-white.gif")
     }
 
     val (allModels, _) = prepareModel(universe)

@@ -1,9 +1,72 @@
 var ex = window.extradoc;
 var baseTitle = "Extradoc Explorer";
-var defaultView = "model";
-var currentTab, currentPage;
-var currentEntity = 0;
-var contentJ, contentPartJs, contentCurrentJ;
+var currentPage, currentEntity = 0, currentSourceUrl;
+var pageCache = new Cache(30);
+
+
+//////////////////////////////////////////////////////////////////////////////
+// View management
+//////////////////////////////////////////////////////////////////////////////
+
+function View(id) {
+  this.id = id;
+  this.contentJ = $("#content_"+id);
+  View[id] = this;
+}
+
+new View("none");
+View.currentID = "none";
+View.defaultView = "model";
+
+View.scrollToEntity = function(entity) {
+  var view = View[View.currentID];
+  var pos = entity > 0 ? $($("ol.page > li")[entity]).position().top + view.contentJ.scrollTop() - 6 : 0;
+  view.contentJ.scrollTop(pos);
+};
+
+View.showMessage = function(msg) { View.msg.show(t(msg)); }
+
+View.prototype.show = function(node, showing) {
+  if(node) this.contentJ.empty().append(node);
+  if(View.currentID == this.id) return;
+  View[View.currentID].contentJ.css("visibility", "hidden");
+  View.currentID = this.id;
+  this.contentJ.css("visibility", "visible");
+  if(node) this.showing = showing;
+};
+
+View.prototype.isShowing = function(showing) {
+  return this.showing && this.showing == showing;
+};
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Tab management
+//////////////////////////////////////////////////////////////////////////////
+
+function Tab(id) {
+  this.id = id;
+  this.tabJ = $("#tab_"+id);
+  this.loading = false;
+  Tab[id] = this;
+}
+
+new Tab("none");
+Tab.currentID = "none";
+
+Tab.prototype.show = function() {
+  if(Tab.currentID == this.id) return;
+  Tab[Tab.currentID].tabJ.toggleClass("selected", false);
+  Tab.currentID = this.id;
+  this.tabJ.toggleClass("selected", true);
+  Tab.loader.css("display", this.loading ? "block" : "none");
+};
+
+Tab.prototype.setLoading = function(b) {
+  this.loading = b;
+  if(Tab.currentID == this.id)
+    Tab.loader.css("display", this.loading ? "block" : "none");
+};
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -27,14 +90,6 @@ function t(t, p) {
   if(p) p.appendChild(n);
   return n;
 }
-
-function scrollToEntity(entity) {
-  var pos;
-  if(entity > 0) {
-    pos = $($("ol.page > li")[entity]).position().top + contentCurrentJ.scrollTop() - 6;
-  } else pos = 0;
-  contentCurrentJ.scrollTop(pos);
-};
 
 function decodeHash(hash) {
   var params = {};
@@ -69,7 +124,7 @@ function showTitle(page) {
         t(kindMarkers[pi.k][0], e("div", null, j[0]));
       }
       var parent = pi && pi["in"];
-      log("page: "+p+", parent: "+parent);
+      //log("page: "+p+", parent: "+parent);
       if(parent && parent != p) f(parent);
       if(first) first = false;
       else t(" . ", j[0]);
@@ -82,29 +137,6 @@ function showTitle(page) {
     }
     f(page);
   }
-}
-
-function activateTab(view) {
-  var id = "tab_"+view;
-  if(currentTab) {
-    if(currentTab == view) return;
-    $("#tab_"+currentTab).toggleClass("selected", false);
-  }
-  currentTab = view;
-  $("#tab_"+view).toggleClass("selected", true);
-}
-
-function showPart(view, e) {
-  contentCurrentJ = contentPartJs[view];
-  if(e) contentCurrentJ.empty().append(e);
-  for(var k in contentPartJs)
-    if(contentPartJs.hasOwnProperty(k))
-      contentPartJs[k].css("display", k === view ? "block" : "none");
-}
-
-function showMessage(msg) {
-  contentPartJs.msg.text(msg);
-  showPart("msg");
 }
 
 var kindMarkers = {
@@ -178,7 +210,7 @@ function markNavigationPage(no) {
 
 
 //////////////////////////////////////////////////////////////////////////////
-// Page loading and caching
+// Page definition
 //////////////////////////////////////////////////////////////////////////////
 
 function Page(model) {
@@ -188,10 +220,9 @@ function Page(model) {
 
 Page.prototype.getDOM = function(view) {
   if(view == "model") return this.getModelDOM();
+  else if(view == "source") return this.getSourceDOM();
   else return this.getPageDOM();
 }
-
-var pageCache = new Cache(10);
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -199,8 +230,76 @@ var pageCache = new Cache(10);
 //////////////////////////////////////////////////////////////////////////////
 
 Page.prototype.getPageDOM = function() {
+  function appendLink(o, node) {
+    var aE = e("a", { href: "#" }, node);
+    aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
+    if(o[0] == currentPage.no) t(currentPage.model[o[1]].name, aE);
+    else t(ex.global.names[o[0]+","+o[1]], aE);
+  }
+
+  function appendXName(o, node) {
+    var spanE = e("span", null, node);
+    $(spanE).append(o._xname);
+    $("a", spanE).each(function(idx) {
+      this.href = "##";
+      this.onclick = function() { goToEntity(o._refs[idx][0], o._refs[idx][1]); return false; }
+    });
+  }
+
+  function appendFlags(e, node) {
+    if(e.isProtected || !e.isPublic) {
+      //--
+      if(!e.visibleIn) {
+        t(e.isProtected ? "protected[this] " : "private[this] ", node);
+      } else if(e.visibleIn.length == 2 && e.inTemplate && e.inTemplate.length == 2) {
+        if(e.visibleIn[0] == e.inTemplate[0] && e.visibleIn[1] == e.inTemplate[1]) {
+          t(e.isProtected ? "protected " : "private ", node);
+        } else {
+          t(e.isProtected ? "protected[" : "private[");
+          appendLink(e.visibleIn, node);
+          t("]", node);
+        }
+      } else {
+        ex.log("Cannot determine visibility for "+e);
+        t(e.isProtected ? "protected[?] " : "private[?] ", node);
+      }
+    }
+    var s = "";
+    if(e.isImplicit) s += "implicit ";
+    if(e.isSealed) s += "sealed ";
+    if(e.isAbstract) s += "abstract ";
+    if(e.isFinal) s += "final ";
+    if(e.isAliasType || e.isAbstractType) s += "type ";
+    else if(e.isCaseClass) s += "case class ";
+    else if(e.isClass) s += "class ";
+    else if(e.isTrait) s += "trait ";
+    else if(e.isObject) s += "object ";
+    else if(e.isPackage) s += "package ";
+    else if(e.isVar) s += "var ";
+    else if(e.isLazyVal) s += "lazy val ";
+    else if(e.isVal) s += "val ";
+    else if(e.isDef) s += "def ";
+    if(s) t(s, node);
+  }
+
+  function createPageDOM(model, o) {
+    var divE = e("div");
+    var titleDivE = e("div", { "class": "title" }, divE);
+    appendFlags(o, titleDivE);
+    t(o.name, titleDivE);
+    if(o.parentType) {
+      t(" extends ", titleDivE);
+      appendXName(o.parentType, titleDivE);
+    }
+    return divE;
+  }
+
+  function createPackagePageDOM(model) {
+    return t("Package pages not implemented yet.");
+  }
+
   if(this.pageDOM) return this.pageDOM;
-  this.pageDOM = t("Page view not implemented yet. Use Model view instead.");
+  this.pageDOM = this.model[0].isPackage ? createPackagePageDOM(this.model) : createPageDOM(this.model, this.model[0]);
   return this.pageDOM;
 }
 
@@ -306,44 +405,94 @@ Page.prototype.getModelDOM = function() {
 
 
 //////////////////////////////////////////////////////////////////////////////
+// Create DOM for Source tab
+//////////////////////////////////////////////////////////////////////////////
+
+Page.prototype.getSourceDOM = function() {
+  var o = this.model[0];
+  function createSourceDOM() {
+    if(!ex.global.settings.docsourceurl) {
+      var divE = e("div", { id: "nosource" });
+      t("No source location defined for this doc site.", e("p", null, divE));
+      Tab["source"].setLoading(false);
+      return divE;
+    }
+    if(!o.sourceUrl) {
+      var divE = e("div", { id: "nosource" });
+      t("No source location defined for "+o.qName+".", e("p", null, divE));
+      var pE = e("p", null, divE);
+      t("The base location for sources is ", pE);
+      t(ex.global.settings.docsourceurl, e("a", { href: ex.global.settings.docsourceurl }, pE));
+      t(".", pE);
+      Tab["source"].setLoading(false);
+      return divE;
+    }
+    var browserE = e("div", { "class": "browser" });
+    var browserHeadE = e("tr", null, e("table", { "class": "head", cellpadding: 0, cellspacing: 0 }, browserE));
+    var thE = e("th", null, browserHeadE);
+    t("Location:", e("a", { href: o.sourceUrl, target: "_blank", title: "Open in New Window" }, thE));
+    e("input", { type: "text", value: o.sourceUrl, readonly: true }, e("td", { width: "100%" }, browserHeadE));
+    var browserBodyE = e("div", { "class": "body" }, browserE);
+    var iframeE = e("iframe", { src: o.sourceUrl }, browserBodyE);
+    $(iframeE).load(function(e) {
+      Tab["source"].setLoading(false);
+    });
+    return browserE;
+  }
+
+  if(o.sourceUrl && o.sourceUrl == currentSourceUrl) {
+    Tab["source"].setLoading(false);
+    return null;
+  }
+  if(this.sourceDOM) {
+    Tab["source"].setLoading(false);
+    return this.sourceDOM;
+  }
+  this.sourceDOM = createSourceDOM();
+  currentSourceUrl = o.sourceUrl;
+  return this.sourceDOM;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
 // Main program
 //////////////////////////////////////////////////////////////////////////////
 
 function goToEntity(page, entity, view) {
   if(!page && page !== 0) page = currentPage ? currentPage.no : 0;
   if(!entity && entity !== 0) entity = currentEntity;
-  if(!view) view = currentTab;
+  if(!view) view = View.currentID;
   var params = { t: ex.global.pageToPageInfo[page].qn };
   if(entity && entity != -1) params.e = entity;
-  if(view && view != defaultView) params.v = view;
+  if(view && view != View.defaultView) params.v = view;
   $.history.load(encodeHash(params));
 }
 
 function loadPage(no, entity, view) {
-  showMessage("Loading page "+no+"...");
+  function ok(page) {
+    currentPage = page;
+    View[view].show(page.getDOM(view), no+","+entity);
+    View.scrollToEntity(entity);
+    if(view != "source") Tab[view].setLoading(false);
+  }
+  var cached = pageCache.getItem("p"+no);
+  if(cached) View.showMessage("Rendering page "+no+"...");
+  else View.showMessage("Loading and rendering page "+no+"...");
   setTimeout(function() {
-    var cached = pageCache.getItem("p"+no);
-    if(cached) {
-      log("Retrieved page from cache");
-      currentPage = cached;
-      showPart(view, cached.getDOM(view));
-      scrollToEntity(entity);
-    } else {
-      log("Loading data...");
+    if(cached) ok(cached);
+    else {
       var t0 = (new Date).getTime();
       ex.load(no, function(model) {
           log("Loaded and prepared page with "+model.length+" entities in "+((new Date).getTime()-t0)+"ms");
           t0 = (new Date).getTime();
           var page = new Page(model);
-          currentPage = page;
           pageCache.setItem("p"+no, page);
-          showPart(view, page.getDOM(view));
+          ok(page);
           log("Rendered in "+((new Date).getTime()-t0)+"ms");
-          scrollToEntity(entity);
         }, function(XMLHttpRequest, textStatus, errorThrown) {
           var errmsg = "Error loading page: "+textStatus+"; "+errorThrown;
           log(errmsg);
-          showMessage(errmsg);
+          View.showMessage(errmsg);
         });
     }
   }, 0);
@@ -358,27 +507,36 @@ function showEntity(params) {
   }
   var entity = params.e || -1;
   var view = params.v;
-  if(!view) view = defaultView;
+  if(!view) view = View.defaultView;
   log("Showing page "+page+", entity "+entity+", view "+view);
-  if(currentPage && page == currentPage.no && currentTab == view)
-    scrollToEntity(entity);
-  else loadPage(page, entity, view);
-  markNavigationPage(page);
+  Tab[view].show();
   showTitle(page);
-  activateTab(view);
+  if(View[view].isShowing(page+","+entity)) View[view].show();
+  else if(currentPage && page == currentPage.no && View.currentID == view)
+    View.scrollToEntity(entity);
+  else {
+    Tab[view].setLoading(true);
+    loadPage(page, entity, view);
+  }
+  markNavigationPage(page);
 }
 
 $(function() {
 
   log("Extradoc Explorer starting");
+
+  new View("page");
+  new View("model");
+  new View("source");
+  new View("msg");
+
+  new Tab("page");
+  new Tab("model");
+  new Tab("source");
+  Tab.loader = $("#loader img");
+
   var navigation = $("#navigation");
-  contentJ = $("#content");
-  contentPartJs = {
-    page: $("#content_page"),
-    model: $("#content_model"),
-    source: $("#content_source"),
-    msg: $("#content_msg")
-  };
+  var contentJ = $("#content");
 
   var inClick = false;
   var rememberedPos = 300;
@@ -424,9 +582,10 @@ $(function() {
       var view = this.id.replace(/^tab_/, "");
       this.onclick = function() { goToEntity(null, null, view); return false; };
     });
+    Tab.loader.css("display", "none");
     $.history.init(function(hash) { showEntity(decodeHash(hash)); }, { unescape: true });
     var aE = e("a", { href: "#" }, $("#leftTitle")[0]);
-    aE.onclick = function() { goToEntity(0, -1, defaultView); return false; }
+    aE.onclick = function() { goToEntity(0, -1, View.defaultView); return false; }
     t(baseTitle, aE);
   }
 

@@ -84,7 +84,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
         b += Elem(null, "a", null, xml.TopScope, Text(name.substring(start, start+len)))
         pos = start+len
       }
-      if(pos < name.length-1) b += Text(name.substring(pos))
+      if(pos < name.length) b += Text(name.substring(pos))
       j += "_xname" -> Xhtml.toXhtml(b)
       j +?= "_refs" -> JArray(links)
     } else {
@@ -192,7 +192,8 @@ abstract class JsonBuilder[Link : CanBeValue] {
       t.sourceUrl foreach { u => j +?= "sourceUrl" -> u.toString }
       j +?= "typeParams" -> createTypeParams(t.typeParams, tParams)
       t.parentType foreach { p => j += "parentType" -> createTypeEntity(p) }
-      j +?= "parentTemplates" -> JArray(t.parentTemplates.map(e => global(e)(createEntity _)))
+      // "parentTemplates" is not needed and has been removed in Scala trunk (2.9)
+      //j +?= "parentTemplates" -> JArray(t.parentTemplates.map(e => global(e)(createEntity _)))
       j +?= "linearization" -> JArray(t.linearization.map(e => global(e)(createEntity _)))
       j +?= "subClasses" -> JArray(t.subClasses.map(e => global(e)(createEntity _)))
       // "members" is constructors + templates + methods + values + abstractTypes + aliasTypes + packages
