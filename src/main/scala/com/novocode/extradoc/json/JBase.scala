@@ -85,7 +85,7 @@ object JBase {
   }
 }
 
-final class JObject extends JBase {
+sealed class JObject extends JBase {
   private val m = new mutable.HashMap[String, Any]
   def += [V](t: (String, V))(implicit cv: CanBeValue[V]) {
     //if(m contains t._1) throw new RuntimeException("Cannot overwrite field "+t._1)
@@ -120,6 +120,10 @@ final class JObject extends JBase {
     }
   }
   def apply(key: String) = m get key
+  def apply[T : ClassManifest](key: String, default: T) = m get key match {
+    case Some(v) if implicitly[ClassManifest[T]].erasure.isInstance(v) => v.asInstanceOf[T]
+    case _ => default
+  }
 }
 
 object JObject {
@@ -129,9 +133,13 @@ object JObject {
     t foreach { case (k,v) => o += k -> v }
     o
   }
+  val Empty: JObject = new JObject {
+    override def += [V](t: (String, V))(implicit cv: CanBeValue[V]) =
+      throw new RuntimeException("Cannot add to JObject.Empty")
+  }
 }
 
-final class JArray extends JBase {
+sealed class JArray extends JBase {
   private val a = new mutable.ArrayBuffer[Any]
   def += [T](v: T)(implicit cv: CanBeValue[T]) = a += v
   def +?= [T](v: T)(implicit cv: CanBeValue[T]) = if(!cv.isEmpty(v)) a += v
@@ -164,6 +172,7 @@ final class JArray extends JBase {
     }
   }
   def values = a.iterator
+  def length = a.length
 }
 
 object JArray {
@@ -173,8 +182,46 @@ object JArray {
     t foreach { j => a += j }
     a
   }
+  val Empty: JArray = new JArray {
+    override def += [T](v: T)(implicit cv: CanBeValue[T]) =
+      throw new RuntimeException("Cannot add to JArray.Empty")
+  }
 }
 
 case class Link(target: Int) {
   override def toString = target.toString
+}
+
+case class LimitedEquality(j: JBase, keys: String*) {
+  override def hashCode: Int = 0 //TODO optimize
+
+  override def equals(o: Any) = o match {
+    case LimitedEquality(o) => LimitedEquality.isEqual(j, o, keys:_*)
+    case _ => false
+  }
+
+}
+
+object LimitedEquality {
+  def isEqual(a: Any, b: Any, keys: String*): Boolean = (a,b) match {
+    case (null, null) => true
+    case (null, _) => false
+    case (_, null) => false
+    case (a: JArray, b: JArray) =>
+      a.length == b.length && (a.values zip b.values forall { case (v,w) => isEqual(v, w, keys:_*) })
+    case (a: JObject, b: JObject) =>
+      keys forall { k =>
+        (a(k), b(k)) match {
+          case (None, None) => true
+          case (None, _) => false
+          case (_, None) => false
+          case (Some(v), Some(w)) => isEqual(v, w, keys:_*)
+        }
+      }
+    case (a: String, b: String) => a == b
+    case (a: Int, b: Int) => a == b
+    case (a: Boolean, b: Boolean) => a == b
+    case (Link(a), Link(b)) => a == b
+    case _ => false
+  }
 }

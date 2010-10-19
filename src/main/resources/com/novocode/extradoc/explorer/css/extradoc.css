@@ -245,6 +245,7 @@ a:hover, a:active {
 }
 
 #navigation ul.packages > li > table {
+  background-color: white;
   display: block;
   padding: 6px 0;
   margin: 0;
@@ -470,6 +471,10 @@ a:hover, a:active {
   border-radius: 6px;
 }
 
+#content_model ol.array > li > div.html {
+  margin: 0.5em 0;
+}
+
 #content_model table.object th.entityhead {
   -webkit-border-top-right-radius: 6px;
   -moz-border-radius-topright: 6px;
@@ -540,7 +545,7 @@ a:hover, a:active {
   background: #e8e8e8;
   background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #f8f8f8), color-stop(1, #e8e8e8));
   background-image: -moz-linear-gradient(center bottom, #f8f8f8 0%, #e8e8e8 100%);
-  border-bottom: 1px solid #a0a0a0;
+  border-bottom: 1px solid #c0c0c0;
   overflow: hidden;
   white-space: nowrap;
   padding: 2px 15px 0px 9px;

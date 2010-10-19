@@ -18,6 +18,7 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
   def prepareModel(universe: Universe) = {
     println("Building JSON model")
     val (allModels, allModelsReverse) = buildModels(universe)
+    //markInheritedMembers(allModels, allModelsReverse)
     while(allModels.size > allModelsReverse.size) compact(allModels, allModelsReverse)
     if(doInline) inline(allModels, allModelsReverse)
     if(allModels.keys.max + 1 != allModels.size) renumber(allModels, allModelsReverse)
@@ -106,6 +107,37 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     for((ord, j) <- allModels) allModelsReverse += j -> ord
     println("Compacted to "+allModels.size+" global objects ("+allModelsReverse.size+" unique)")
   }
+
+  /* def markInheritedMembers(allModels: mutable.HashMap[Int, JBase], allModelsReverse: mutable.HashMap[JBase, Int]) {
+    def forMembers(j: JObject, jIdx: Int)(f: (JObject, JObject, Int) => Unit) {
+      j("values", new JArray).values ++ j("methods", new JArray).values foreach {
+        case l: Link => f(allModels(l.target).asInstanceOf[JObject], j, jIdx)
+        case _ =>
+      }
+    }
+    def forAllMembers(f: (JObject, JObject, Int) => Unit) {
+      allModels foreach {
+        case (idx, j: JObject) => forMembers(j, idx)(f)
+        case _ =>
+      }
+    }
+    forAllMembers { (j, parent, parentIdx) =>
+      val jDefName = j("definitionName", "..")
+      if(!(j("inDefinitionTemplates", new JArray).values contains Link(parentIdx))) {
+        var matches = 0
+        parent("linearization", new JArray).values.toSeq.reverse foreach {
+          case Link(t) =>
+            val possibleParent = allModels(t).asInstanceOf[JObject]
+            forMembers(possibleParent, t) { (parMember, _, _) =>
+              if(parMember("definitionName", "") == jDefName) matches += 1
+              //if(LimitedEquality.isEqual(parMember, j, XXXXX) matches += 1
+            }
+          case _ =>
+        }
+        j += "inherited" -> ("===> "+matches+" matches")
+      }
+    }
+  } */
 
   def renumber(allModels: mutable.HashMap[Int, JBase], allModelsReverse: mutable.HashMap[JBase, Int]) {
     println("Renumbering objects")

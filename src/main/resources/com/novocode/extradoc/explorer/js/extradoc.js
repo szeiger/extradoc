@@ -7,6 +7,7 @@ var linkKeys = {
   "primaryConstructor": true,
   "typeParams[]": true,
   "inDefinitionTemplates[]": true,
+  "alsoIn[]": true,
   "inheritedFrom[]": true,
   "parentTemplates[]": true,
   "linearization[]": true,
@@ -21,7 +22,8 @@ var linkKeys = {
   "_links[]": true,
   "_refs[]": true,
   "valueParams[][]": true,
-  "e": true
+  "e": true,
+  "commentIn": true
 };
 
 var mapKeys = { "throws": true };
@@ -57,7 +59,7 @@ ex.load = function(pageNo, ok, err) {
 function resolveObject(o, name) {
   var isMap = !!mapKeys[name];
   if(!isMap) {
-    if(o.qName) {
+    if(o.qName || o.name) {
       o._isEntity = true;
       if(!o.name) o.name = getEntityName(o);
     }
@@ -85,8 +87,6 @@ function resolveObject(o, name) {
           case 'C': o.isCaseClass = true; break;
           case 'U': o.isUseCase = true; break;
           case 'P': o.isPrimary = true; break;
-          case 'y': o.isTypeParam = true; break;
-          case 'R': o.isValueParam = true; break;
           case 's': o.isSealed = true; break;
           case 'B': o.isAbstract = true; break;
           case 'f': o.isFinal = true; break;
@@ -202,8 +202,6 @@ boolean
   "isCaseClass"
   "isUseCase"
   "isPrimary"
-  "isTypeParam"
-  "isValueParam"
   "isSealed"
   "isAbstract"
   "isFinal"

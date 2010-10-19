@@ -20,7 +20,14 @@ View.defaultView = "model";
 
 View.scrollToEntity = function(entity) {
   var view = View[View.currentID];
-  var pos = entity > 0 ? $($("ol.page > li")[entity]).position().top + view.contentJ.scrollTop() - 6 : 0;
+  var pos = 0;
+  if(entity > 0) {
+    var epos = $($("ol.page > li")[entity]).position();
+    if(epos) {
+      pos = epos.top;
+      pos += view.contentJ.scrollTop() - 6;
+    }
+  }
   view.contentJ.scrollTop(pos);
 };
 
@@ -28,11 +35,11 @@ View.showMessage = function(msg) { View.msg.show(t(msg)); }
 
 View.prototype.show = function(node, showing) {
   if(node) this.contentJ.empty().append(node);
+  this.showing = showing;
   if(View.currentID == this.id) return;
   View[View.currentID].contentJ.css("visibility", "hidden");
   View.currentID = this.id;
   this.contentJ.css("visibility", "visible");
-  if(node) this.showing = showing;
 };
 
 View.prototype.isShowing = function(showing) {
@@ -316,7 +323,7 @@ Page.prototype.getModelDOM = function() {
       var trE = e("tr", null, tbodyE);
       var thE = e("th", { colspan: 2, "class": "entityhead" }, trE);
       t(o.name, e("span", null, thE));
-      t(o.qName, thE);
+      t(o.qName || "", thE);
     }
     var is = null;
     if(o._isEntity) {
@@ -512,8 +519,10 @@ function showEntity(params) {
   Tab[view].show();
   showTitle(page);
   if(View[view].isShowing(page+","+entity)) View[view].show();
-  else if(currentPage && page == currentPage.no && View.currentID == view)
+  else if(currentPage && page == currentPage.no && View.currentID == view) {
+    View[view].show();
     View.scrollToEntity(entity);
+  }
   else {
     Tab[view].setLoading(true);
     loadPage(page, entity, view);

@@ -13,6 +13,8 @@ abstract class JsonBuilder[Link : CanBeValue] {
   val compactFlags: Boolean
   val removeSimpleBodyDocs: Boolean
 
+  val mergeInheritedMembers = true
+
   def global[T <: Entity](e: T)(f: T => JBase): Link
 
   def as[T](o: AnyRef)(f: T => Unit)(implicit m: ClassManifest[T]): Unit =
@@ -31,7 +33,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
     val ns = f(gen)
     val j = new JObject
     j +?= "_links" -> gen.links
-    j += "_html" -> (if(ns == Text("no summary matey")) "" else gen.mkString(ns).trim)
+    j += "_html" -> gen.mkString(ns)
     j
   }
 
@@ -51,8 +53,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
     if(removeSimpleBodyDocs) {
       val bodyHtml = bodyDoc("_html").getOrElse("").asInstanceOf[String]
       val shortHtml = shortDoc("_html").getOrElse("").asInstanceOf[String]
-      val bodyIsSimple = bodyHtml.startsWith("<p>") && bodyHtml.endsWith("</p>") &&
-        bodyHtml.substring(3, bodyHtml.length-4).trim == shortHtml
+      val bodyIsSimple = bodyHtml == shortHtml
       if(!bodyIsEmpty && (bodyDoc("_links").isDefined || shortDoc("_links").isDefined || !bodyIsSimple))
         j += "body" -> bodyDoc
     } else if(!bodyIsEmpty) j += "body" -> bodyDoc
@@ -141,8 +142,6 @@ abstract class JsonBuilder[Link : CanBeValue] {
         vParams = v
         tParams = t
       }
-      j += "inDefinitionTemplates" -> JArray(m.inDefinitionTemplates.map(e => global(e)(createEntity _)))
-      j +?= "definitionName" -> m.definitionName
       if(compactFlags) {
         if(m.visibility.isProtected) set(j, 'o')
         if(m.visibility.isPublic) set(j, 'u')
@@ -152,6 +151,32 @@ abstract class JsonBuilder[Link : CanBeValue] {
       }
       as[PrivateInTemplate](m.visibility) { p => j += "visibleIn" -> global(p.owner)(createEntity _) }
       as[ProtectedInTemplate](m.visibility) { p => j += "visibleIn" -> global(p.owner)(createEntity _) }
+      if(mergeInheritedMembers) {
+        if(!m.inheritedFrom.isEmpty) {
+          /* Remove "inheritedFrom", replace "inTemplate" with first from
+             "inDefinitionTemplates" and replace "qName" with "definitionName"
+             to make this inherited member definition identical to the original
+             one so it can be compacted away and remapped to the correct
+             page. */
+          val originalOwnerLink = global(m.inDefinitionTemplates.head)(createEntity _)
+          j += "inTemplate" -> originalOwnerLink
+          j += "qName" -> m.definitionName
+          /* If the member is visible in its inTemplate, it must have been
+             inDefinitionTemplates.first at the point of its definition, so we
+             rewrite it that way. */
+          if(j("visibleIn", Link(-1)).target != -1)
+            j += "visibleIn" -> originalOwnerLink
+          // inDefinitionTemplate.head has already become inTemplate
+          j +?= "alsoIn" -> JArray(m.inDefinitionTemplates.tail.map(e => global(e)(createEntity _)))
+        } else {
+          // filter out inTemplate
+          j +?= "alsoIn" -> JArray(m.inDefinitionTemplates.filter(_ != m.inTemplate).map(e => global(e)(createEntity _)))
+        }
+        // definitionName is always identical to qName, so leave it out
+      } else {
+        j +?= "inheritedFrom" -> JArray(m.inheritedFrom.map(e => global(e)(createEntity _)))
+        j +?= "definitionName" -> m.definitionName
+      }
       m.flags.map(createBlock _) foreach { fj =>
         fj("_html") match {
           case Some("<p>sealed</p>") =>
@@ -164,7 +189,6 @@ abstract class JsonBuilder[Link : CanBeValue] {
         }
       }
       m.deprecation foreach { d => j += "deprecation" -> createBody(d) }
-      j +?= "inheritedFrom" -> JArray(m.inheritedFrom.map(e => global(e)(createEntity _)))
       j += "resultType" -> createTypeEntity(m.resultType)
       if(compactFlags) {
         if(m.isDef) set(j, 'd')
@@ -209,8 +233,12 @@ abstract class JsonBuilder[Link : CanBeValue] {
       j +?= "valueParams" -> createValueParams(t.valueParams, vParams)
     }
     as[Class](e) { c =>
-      c.primaryConstructor foreach { c => j += "primaryConstructor" -> global(c)(createEntity _) }
-      j +?= "constructors" -> JArray(c.constructors.map(e => global(e)(createEntity _)))
+      val (pcons, ocons) = c.constructors partition { _.isPrimary }
+      val cons = pcons ++ ocons
+      // primaryConstructor is the first constructor if it has isPrimary = true,
+      // otherwise the primary constructor is private (and thus missing from the model)
+      //c.primaryConstructor foreach { c => j += "primaryConstructor" -> global(c)(createEntity _) }
+      j +?= "constructors" -> JArray(cons.map(e => global(e)(createEntity _)))
       if(c.isCaseClass) {
         if(compactFlags) set(j, 'C')
         else j += "isCaseClass" -> true
@@ -240,10 +268,8 @@ abstract class JsonBuilder[Link : CanBeValue] {
     }
     as[AliasType](e) { a => j += "alias" -> createTypeEntity(a.alias) }
     as[ParameterEntity](e) { p =>
-      if(compactFlags) {
-        if(p.isTypeParam) set(j, 'y')
-        if(p.isValueParam) set(j, 'R')
-      } else {
+      if(!compactFlags) {
+        // These two are not represented with compact flags
         if(p.isTypeParam) j += "isTypeParam" -> true
         if(p.isValueParam) j += "isValueParam" -> true
       }
@@ -303,8 +329,6 @@ abstract class JsonBuilder[Link : CanBeValue] {
    * C: isCaseClass
    * U: isUseCase
    * P: isPrimary
-   * y: isTypeParam
-   * R: isValueParam
    * s: isSealed
    * B: isAbstract
    * f: isFinal
