@@ -124,6 +124,7 @@ sealed class JObject extends JBase {
     case Some(v) if implicitly[ClassManifest[T]].erasure.isInstance(v) => v.asInstanceOf[T]
     case _ => default
   }
+  def keys = m.keys.iterator
 }
 
 object JObject {
@@ -173,6 +174,13 @@ sealed class JArray extends JBase {
   }
   def values = a.iterator
   def length = a.length
+  def transform(f: (Int, Any) => Any) {
+    var i = 0
+    while(i < a.length) {
+      a(i) = f(i, a(i))
+      i += 1
+    }
+  }
 }
 
 object JArray {

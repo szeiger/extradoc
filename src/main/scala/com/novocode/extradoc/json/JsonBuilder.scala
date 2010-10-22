@@ -115,7 +115,11 @@ abstract class JsonBuilder[Link : CanBeValue] {
     if(sep > 0 && qName.substring(sep+1) == name || sep == -1 && qName == name) name = null
     j += "qName" -> e.qualifiedName
     if(name ne null) j += "name" -> e.name
+    var isPackageOrClassOrTraitOrObject = false
+    var isClassOrTrait = false
     as[TemplateEntity](e) { t =>
+      isPackageOrClassOrTraitOrObject = t.isPackage || t.isClass || t.isTrait || t.isObject || t.isRootPackage
+      isClassOrTrait = t.isClass || t.isTrait
       if(compactFlags) {
         if(t.isPackage) set(j, 'p')
         if(t.isRootPackage) set(j, 'r')
@@ -189,7 +193,8 @@ abstract class JsonBuilder[Link : CanBeValue] {
         }
       }
       m.deprecation foreach { d => j += "deprecation" -> createBody(d) }
-      j += "resultType" -> createTypeEntity(m.resultType)
+      if(!m.isAliasType && !isPackageOrClassOrTraitOrObject)
+        j += "resultType" -> createTypeEntity(m.resultType)
       if(compactFlags) {
         if(m.isDef) set(j, 'd')
         if(m.isVal) set(j, 'v')
@@ -288,6 +293,9 @@ abstract class JsonBuilder[Link : CanBeValue] {
         else j += "isImplicit" -> true
       }
     }
+    // Traits have empty dummy valueParams, and for classes they are
+    // duplicates from the primary constructor
+    if(isClassOrTrait) j -= "valueParams"
     j
   }
 

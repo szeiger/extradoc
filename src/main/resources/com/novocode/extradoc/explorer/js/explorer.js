@@ -1,6 +1,6 @@
 var ex = window.extradoc;
 var baseTitle = "Extradoc Explorer";
-var currentPage, currentEntity = 0, currentSourceUrl;
+var currentPage;
 var pageCache = new Cache(30);
 
 
@@ -35,7 +35,7 @@ View.showMessage = function(msg) { View.msg.show(t(msg)); }
 
 View.prototype.show = function(node, showing) {
   if(node) this.contentJ.empty().append(node);
-  this.showing = showing;
+  if(showing) this.showing = showing;
   if(View.currentID == this.id) return;
   View[View.currentID].contentJ.css("visibility", "hidden");
   View.currentID = this.id;
@@ -43,6 +43,7 @@ View.prototype.show = function(node, showing) {
 };
 
 View.prototype.isShowing = function(showing) {
+  //log("View is showing "+this.showing);
   return this.showing && this.showing == showing;
 };
 
@@ -153,6 +154,45 @@ var kindMarkers = {
   p: ["P", "package"]
 };
 
+function loadAuxModels(nos, done) {
+  var o = { nos: nos, errors: [], loaded: 0, toLoad: 0, total: nos.length };
+  for(var i=0; i<o.total; i++) {
+    var no = nos[i];
+    var cached = pageCache.getItem("p"+no);
+    if(cached) o[no] = cached.model;
+    else o.toLoad++;
+  }
+  function then() {
+    if(o.loaded == o.toLoad) {
+      var count = 0;
+      for(var j=0; j<o.total; j++) if(o[nos[j]]) count += o[nos[j]].length;
+      log("Loaded and prepared "+o.total+" aux models with "+count+" entities in "+((new Date).getTime()-t0)+"ms");
+      done(o);
+    }
+  }
+  function loadOne(no) {
+    ex.load(no, function(model) {
+        var page = new Page(model);
+        pageCache.setItem("p"+no, page);
+        o.loaded++;
+        o[no] = page.model;
+        then();
+      }, function(XMLHttpRequest, textStatus, errorThrown) {
+        var msg = textStatus+"; "+errorThrown;
+        log(msg);
+        o.loaded++;
+        o.errors[o.errors.length] = msg;
+        then();
+      });
+  };
+  if(o.toLoad == 0) done(o);
+  else {
+    log("Loading "+o.toLoad+" aux models, "+(o.total-o.toLoad)+" already cached");
+    var t0 = (new Date).getTime();
+    for(var i=0; i<o.total; i++) if(!o[nos[i]]) loadOne(nos[i]);
+  }
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Create DOM for navigation area
@@ -163,7 +203,8 @@ var selectedNavigationPage = null;
 
 function createNavigationDOM() {
   var packages = ex.global.packages;
-  var ulE = e("ul", { "class": "packages" });
+  var divE = e("div");
+  var ulE = e("ul", { "class": "packages" }, divE);
   function createPackageDOM(p) {
     var liE = e("li", null, ulE);
     var aE = e("a", { href: "#" }, e("span", null, liE));
@@ -197,7 +238,10 @@ function createNavigationDOM() {
   };
   for(var i=0; i<packages.length; i++)
     if(packages[i].n !== "_root_") createPackageDOM(packages[i]);
-  return ulE;
+  var footerE = e("div", null, e("div", { "id": "navfooter" }, divE));
+  t("Created with ", footerE);
+  t("Extradoc", e("a", { href: "http://github.com/szeiger/extradoc" }, footerE));
+  return divE;
 }
 
 function markNavigationPage(no) {
@@ -225,10 +269,16 @@ function Page(model) {
   this.no = model._no;
 }
 
-Page.prototype.getDOM = function(view) {
-  if(view == "model") return this.getModelDOM();
-  else if(view == "source") return this.getSourceDOM();
-  else return this.getPageDOM();
+Page.prototype.hasDOM = function(view) {
+  if(view == "model") return !!this.modelDOM;
+  else if(view == "source") return !!this.sourceDOM;
+  else return !!this.pageDOM;
+}
+
+Page.prototype.createOrGetDOM = function(view, cont) {
+  if(view == "model") this.createOrGetModelDOM(cont);
+  else if(view == "source") this.createOrGetSourceDOM(cont);
+  else this.createOrGetPageDOM(cont);
 }
 
 
@@ -236,11 +286,14 @@ Page.prototype.getDOM = function(view) {
 // Create DOM for Page tab
 //////////////////////////////////////////////////////////////////////////////
 
-Page.prototype.getPageDOM = function() {
+Page.prototype.createOrGetPageDOM = function(cont) {
+  var that = this;
+  var models = null;
+
   function appendLink(o, node) {
     var aE = e("a", { href: "#" }, node);
     aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
-    if(o[0] == currentPage.no) t(currentPage.model[o[1]].name, aE);
+    if(o[0] == that.no) t(that.model[o[1]].name, aE);
     else t(ex.global.names[o[0]+","+o[1]], aE);
   }
 
@@ -289,25 +342,154 @@ Page.prototype.getPageDOM = function() {
     if(s) t(s, node);
   }
 
-  function createPageDOM(model, o) {
-    var divE = e("div");
-    var titleDivE = e("div", { "class": "title" }, divE);
-    appendFlags(o, titleDivE);
-    t(o.name, titleDivE);
-    if(o.parentType) {
-      t(" extends ", titleDivE);
-      appendXName(o.parentType, titleDivE);
+  function resolve(o) { return o._isLink ? models[o[0]][o[1]] : o; }
+
+  function appendTypeParam(tp, node) {
+    if(typeof tp === "string") t(tp, node);
+    else {
+      tp = resolve(tp);
+      t(tp.variance ? tp.variance + tp.name : tp.name, node);
+      if(tp.lo) {
+        t(" >: ", node);
+        appendXName(tp.lo, node);
+      }
+      if(tp.hi) {
+        t(" <: ", node);
+        appendXName(tp.hi, node);
+      }
     }
-    return divE;
   }
 
-  function createPackagePageDOM(model) {
-    return t("Package pages not implemented yet.");
+  function appendHTML(o, elName, node, params) {
+    var cls = params && params.cls;
+    if(o._xname) {
+      var el = e(elName, { "class": cls ? "xname " + cls : "xname" }, node);
+      appendXName(o, el);
+    } else if(o._isLink) {
+      var el = e(elName, { "class": cls ? "link " + cls : "link" }, node);
+      var aE = e("a", { href: "#" }, el);
+      aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
+      if(o[0] == that.no) t(that.model[o[1]].name, aE);
+      else t(ex.global.names[o[0]+","+o[1]], aE);
+    } else {
+      var el = e(elName, { "class": cls ? "html " + cls : "html" }, node);
+      $(el).append(o._html); //TODO Hook up links
+    }
   }
 
-  if(this.pageDOM) return this.pageDOM;
-  this.pageDOM = this.model[0].isPackage ? createPackagePageDOM(this.model) : createPageDOM(this.model, this.model[0]);
-  return this.pageDOM;
+  function appendDefLine(name, o, tbl, params) {
+    if(!o) return;
+    var sep = params && params.sep;
+    if(typeof o.length === "number" && !o._isLink) {
+      if(sep) {
+        var trE = e("tr", null, tbl);
+        t(name, e("th", null, trE));
+        var tdE = e("td", null, trE);
+        for(var i=0; i<o.length; i++) {
+          if(i != 0) t(sep, tdE);
+          appendHTML(o[i], "span", tdE);
+        }
+      } else {
+        for(var i=0; i<o.length; i++) {
+          var trE = e("tr", null, tbl);
+          if(i == 0) t(name, e("th", { rowspan: o.length }, trE));
+          appendHTML(o[i], "td", trE);
+        }
+      }
+    } else {
+      var trE = e("tr", null, tbl);
+      t(name, e("th", null, trE));
+      appendHTML(o, "td", trE);
+    }
+  }
+
+  function appendDefTable(name, cls, node) {
+    var tE = e("table", { "class": "deftable " + (cls || ""), cellpadding: 0, cellspacing: 0 }, node);
+    if(name) t(name, e("th", { colspan: 2 }, e("tr", { "class": "head" }, tE)));
+    return tE;
+  }
+
+  function createPageDOM(o) {
+    var divE = e("div", { "id": "page" });
+    // Template signature line
+    var titleDivE = e("div", { "id": "pgtitle" }, divE);
+    appendFlags(o, titleDivE);
+    t(o.name, e("span", { "class": "etitle" }, titleDivE));
+    if(o.typeParams) {
+      t("[", titleDivE);
+      for(var i=0; i<o.typeParams.length; i++) {
+        if(i != 0) t(", ", titleDivE);
+        appendTypeParam(o.typeParams[i], titleDivE);
+      }
+      t("]", titleDivE);
+    }
+    if(o.parentType) {
+      var extE = e("span", { "class": "extends" }, titleDivE);
+      t(" extends ", extE);
+      appendXName(o.parentType, extE);
+    }
+    var bodyDivE = e("div", { "id": "pgbody" }, divE);
+    // Main doc comment
+    var doc = o.comment ? (o.comment.body || o.comment["short"]) : null;
+    if(doc) appendHTML(doc, "div", bodyDivE);
+    // Type parameter docs
+    if(o.typeParams) {
+      var defE = appendDefTable("Type Parameters", "tparams");
+      var numTPs = 0;
+      for(var i=0; i<o.typeParams.length; i++) {
+        var tp = resolve(o.typeParams[i]);
+        if((typeof tp !== "string") && tp.doc) {
+          appendDefLine(tp.name, tp.doc, defE);
+          numTPs++;
+        }
+      }
+      if(numTPs > 0) bodyDivE.appendChild(defE);
+    }
+    if((o.comment && (o.comment.version || o.comment.since || o.comment.authors)) || o.companion || o.linearization || o.subClasses) {
+      var defE = appendDefTable(null, "tags", bodyDivE);
+      if(o.comment) {
+        appendDefLine("Version", o.comment.version, defE);
+        appendDefLine("Since", o.comment.since, defE);
+        if(o.comment.authors)
+          appendDefLine(o.comment.authors.length == 1 ? "Author" : "Authors", o.comment.authors, defE);
+      }
+      appendDefLine("Companion", o.companion, defE);
+      appendDefLine("Subclasses", o.subClasses, defE, { sep: ", " });
+      appendDefLine("Linearization", o.linearization, defE, { sep: ", " });
+    }
+
+    that.pageDOM = divE;
+    cont(that.pageDOM);
+  }
+
+  function loadAuxAndCreate(o) {
+    var pagesNeeded = [];
+    if(o.linearization) {
+      for(var i=0; i<o.linearization.length; i++) {
+        var lin = o.linearization[i];
+        if(typeof lin === "object" && lin.hasOwnProperty("length") && lin[0] != that.model._no)
+          pagesNeeded[pagesNeeded.length] = lin[0];
+      }
+    }
+    if(pagesNeeded.length) {
+      View.showMessage("Loading "+pagesNeeded.length+" additional models...");
+      loadAuxModels(pagesNeeded, function(aux) {
+        models = aux;
+        models[that.no] = that.model;
+        createPageDOM(o);
+      });
+    }
+    else createPageDOM(o);
+  }
+
+  function createPackagePageDOM() {
+    that.pageDOM = t("Package pages not implemented yet.");
+    cont(that.pageDOM);
+  }
+
+  if(this.pageDOM) cont(this.pageDOM);
+  /*if(this.model[0].isPackage) createPackagePageDOM();
+  else*/ loadAuxAndCreate(this.model[0]);
 }
 
 
@@ -315,7 +497,9 @@ Page.prototype.getPageDOM = function() {
 // Create DOM for Model tab
 //////////////////////////////////////////////////////////////////////////////
 
-Page.prototype.getModelDOM = function() {
+Page.prototype.createOrGetModelDOM = function(cont) {
+  var that = this;
+
   function createObjectDOM(o, no) {
     var tableE = e("table", { "class": "object", cellspacing: 0, cellpadding: 0 });
     var tbodyE = e("tbody", null, tableE);
@@ -360,9 +544,9 @@ Page.prototype.getModelDOM = function() {
       var spanE = e("span");
       var aE = e("a", { href: "#" }, spanE);
       aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
-      if(o[0] == currentPage.no) t(currentPage.model[o[1]].name, aE);
+      if(o[0] == that.no) t(that.model[o[1]].name, aE);
       else t(ex.global.names[o[0]+","+o[1]], aE);
-      t((o[0] == currentPage.no ? "\u2192 " : "\u2197 ")+o[0]+", "+o[1], e("span", { "class": "entityno" }, spanE));
+      t((o[0] == that.no ? "\u2192 " : "\u2197 ")+o[0]+", "+o[1], e("span", { "class": "entityno" }, spanE));
       return spanE;
     }
     else if(o.hasOwnProperty("length")) {
@@ -379,6 +563,7 @@ Page.prototype.getModelDOM = function() {
     else if(o.hasOwnProperty("_html")) {
       var divE = e("div", { "class": "html" });
       $(divE).append(o._html);
+      //TODO Hook up links
       return divE;
     }
     else if(o.hasOwnProperty("_xname")) {
@@ -405,9 +590,8 @@ Page.prototype.getModelDOM = function() {
     return divE;
   };
 
-  if(this.modelDOM) return this.modelDOM;
-  this.modelDOM = createModelDOM(this.model);
-  return this.modelDOM;
+  if(!this.modelDOM) this.modelDOM = createModelDOM(this.model);
+  cont(this.modelDOM);
 };
 
 
@@ -415,7 +599,7 @@ Page.prototype.getModelDOM = function() {
 // Create DOM for Source tab
 //////////////////////////////////////////////////////////////////////////////
 
-Page.prototype.getSourceDOM = function() {
+Page.prototype.createOrGetSourceDOM = function(cont) {
   var o = this.model[0];
   function createSourceDOM() {
     if(!ex.global.settings.docsourceurl) {
@@ -447,17 +631,17 @@ Page.prototype.getSourceDOM = function() {
     return browserE;
   }
 
-  if(o.sourceUrl && o.sourceUrl == currentSourceUrl) {
+  if(o.sourceUrl && o.sourceUrl == this.currentSourceUrl) {
     Tab["source"].setLoading(false);
-    return null;
-  }
-  if(this.sourceDOM) {
+    cont(null);
+  } else if(this.sourceDOM) {
     Tab["source"].setLoading(false);
-    return this.sourceDOM;
+    cont(this.sourceDOM);
+  } else {
+    this.sourceDOM = createSourceDOM();
+    this.currentSourceUrl = o.sourceUrl;
+    cont(this.sourceDOM);
   }
-  this.sourceDOM = createSourceDOM();
-  currentSourceUrl = o.sourceUrl;
-  return this.sourceDOM;
 }
 
 
@@ -467,7 +651,7 @@ Page.prototype.getSourceDOM = function() {
 
 function goToEntity(page, entity, view) {
   if(!page && page !== 0) page = currentPage ? currentPage.no : 0;
-  if(!entity && entity !== 0) entity = currentEntity;
+  if(!entity) entity = 0;
   if(!view) view = View.currentID;
   var params = { t: ex.global.pageToPageInfo[page].qn };
   if(entity && entity != -1) params.e = entity;
@@ -478,9 +662,11 @@ function goToEntity(page, entity, view) {
 function loadPage(no, entity, view) {
   function ok(page) {
     currentPage = page;
-    View[view].show(page.getDOM(view), no+","+entity);
-    View.scrollToEntity(entity);
-    if(view != "source") Tab[view].setLoading(false);
+    page.createOrGetDOM(view, function(dom) {
+      View[view].show(dom, no+","+entity);
+      View.scrollToEntity(entity);
+      if(view != "source") Tab[view].setLoading(false);
+    });
   }
   var cached = pageCache.getItem("p"+no);
   if(cached) View.showMessage("Rendering page "+no+"...");
@@ -520,7 +706,7 @@ function showEntity(params) {
   showTitle(page);
   if(View[view].isShowing(page+","+entity)) View[view].show();
   else if(currentPage && page == currentPage.no && View.currentID == view) {
-    View[view].show();
+    View[view].show(null, page+","+entity);
     View.scrollToEntity(entity);
   }
   else {
@@ -531,22 +717,10 @@ function showEntity(params) {
 }
 
 $(function() {
-
   log("Extradoc Explorer starting");
-
-  new View("page");
-  new View("model");
-  new View("source");
-  new View("msg");
-
-  new Tab("page");
-  new Tab("model");
-  new Tab("source");
-  Tab.loader = $("#loader img");
-
-  var navigation = $("#navigation");
-  var contentJ = $("#content");
-
+  new View("page"); new View("model"); new View("source"); new View("msg");
+  new Tab("page"); new Tab("model"); new Tab("source"); Tab.loader = $("#loader img");
+  var navigation = $("#navigation"), contentJ = $("#content");
   var inClick = false;
   var rememberedPos = 300;
   var separator = $("#separator").draggable({

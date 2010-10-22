@@ -16,6 +16,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
   override val typeEntitiesAsHtml = true
   override val compactFlags = true
   override val removeSimpleBodyDocs = true
+  override val simpleParamsAsString = true
 
   case class Page(no: Int, main: Int) {
     val objects = new mutable.HashSet[Int]
@@ -46,7 +47,10 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
         val isPage = pages contains ord
         val isPackage = j("isPackage", false) || j("is", "").contains('p')
         def isObject = j("isObject", false) || j("is", "").contains('b')
-        def parent = j("inTemplate") collect { case Link(t) => allModels(t) }
+        lazy val parent = j("inTemplate") collect { case Link(t) => allModels(t) }
+        def parentIsTemplate = parent collect { case par: JObject =>
+          par("isTemplate", false) || par("is", "").contains('M')
+        } getOrElse false
         def isInParent = parent collect { case par: JObject =>
           (par("values", JArray.Empty).values ++ par("methods", JArray.Empty).values) contains Link(ord)
         } getOrElse false
@@ -56,7 +60,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
         // Map auto-generated case class companion objects without a separate page to their classes
         else if(isObject && companionPage.isDefined && !isPage) companionPage.get
         // Treat members which were remapped but not compacted away as extras
-        else if((isDef(j) || isVal(j) || isAliasType(j)) && !isInParent) None
+        else if((isDef(j) || isVal(j) || isAliasType(j)) && !isInParent && parentIsTemplate) None
         else j("inTemplate") match {
           case Some(Link(target)) =>
             pages get target orElse (allModels get target flatMap (ch => findPage(target, ch)))
@@ -147,7 +151,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     }
     println("Inlined "+totalInlined+" objects")
 
-    println("Removing qualified names of def, vals and alias types")
+    println("Removing qualified names of defs, vals and alias types")
     allModels.values foreach {
       case j: JObject =>
         if(isDef(j) || isVal(j) || isAliasType(j)) {
@@ -291,13 +295,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     println("Aliased "+count+" comments")
   }
 
-  def qNameToName(qName: String) = {
-    val (s1, s2) = (qName.lastIndexOf('#'), qName.lastIndexOf('.'))
-    val sep = if(s1 > s2) s1 else s2
-    qName.substring(sep+1)
-  }
-
   def isDef(j: JObject) = j("isDef", false) || j("is", "").contains('d')
   def isVal(j: JObject) = j("isVal", false) || j("is", "").contains('v') || j("isLazyVal", false) || j("is", "").contains('l')
-  def isAliasType(j) = j("isAliasType", false) || j("is", "").contains('a')
+  def isAliasType(j: JObject) = j("isAliasType", false) || j("is", "").contains('a')
 }
