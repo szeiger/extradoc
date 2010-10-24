@@ -21,6 +21,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
   case class Page(no: Int, main: Int) {
     val objects = new mutable.HashSet[Int]
     val renumbered = new mutable.ArrayBuffer[Int]
+    lazy val renumberedMap = renumbered.zipWithIndex.toMap // don't access until "renumbered" is stable
   }
 
   def generate(universe: Universe): Unit = {
@@ -172,23 +173,42 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     }
     println("Writing p0.json to p"+(pages.size-1)+".json")
     val globalNames = new mutable.HashMap[String, String]
-    for(p <- pages.values) {
-      val renumberedMap = p.renumbered.zipWithIndex.toMap
-      JsonWriter(siteRoot, "p"+p.no+".json") createArray { w =>
-        for(ord <- p.renumbered) {
-          w.write(allModels(ord), { l: Link =>
-            renumberedMap get l.target getOrElse {
-              val (page, idx) = remappedIDs(l)
-              if(idx == 0 || page != p.no) {
-                val jo = allModels(l.target).asInstanceOf[JObject]
-                jo("name") orElse { jo("qName") map { q => qNameToName(q.asInstanceOf[String]) } } foreach { case n: String =>
-                  globalNames += page+","+idx -> n
-                }
-              }
-              JArray(Seq(page, idx))
-            }
-          })
+    def convertLink(p: Page)(l: Link) = {
+      val localIdx: Option[Int] = p.renumberedMap get l.target
+      val localOrParentIdx: Option[Any] = localIdx orElse {
+        val lin = allModels(p.main).asInstanceOf[JObject].apply("linearization", JArray.Empty).values;
+        val parentIdx = lin.toSeq.view flatMap {
+          case Link(t2) =>
+            pages get t2 flatMap { p2 => p2.renumberedMap get l.target map { (p2.no, _) } }
+          case _ => None
         }
+        parentIdx foreach { case (page, idx) =>
+          //TODO Remove this block so that links that go up in the linearization are not added
+          //to the global names index. This requires that the "Model" view in the explorer can
+          //load the linearization and resolve the links there.
+          if(idx == 0 || page != p.no) {
+            val jo = allModels(l.target).asInstanceOf[JObject]
+            jo("name") orElse { jo("qName") map { q => qNameToName(q.asInstanceOf[String]) } } foreach { case n: String =>
+              globalNames += page+","+idx -> n
+            }
+          }
+        }
+        parentIdx map { case (page, idx) => JArray(Seq(page, idx)) } headOption
+      }
+      localOrParentIdx getOrElse {
+        val (page, idx) = remappedIDs(l)
+        if(idx == 0 || page != p.no) {
+          val jo = allModels(l.target).asInstanceOf[JObject]
+          jo("name") orElse { jo("qName") map { q => qNameToName(q.asInstanceOf[String]) } } foreach { case n: String =>
+            globalNames += page+","+idx -> n
+          }
+        }
+        JArray(Seq(page, idx))
+      }
+    }
+    for(p <- pages.values) {
+      JsonWriter(siteRoot, "p"+p.no+".json") createArray { w =>
+        for(ord <- p.renumbered) w.write(allModels(ord), convertLink(p))
       }
     }
 
