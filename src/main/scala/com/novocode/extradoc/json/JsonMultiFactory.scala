@@ -180,17 +180,6 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
             pages get t2 flatMap { p2 => p2.renumberedMap get l.target map { (p2.no, _) } }
           case _ => None
         }
-        parentIdx foreach { case (page, idx) =>
-          //TODO Remove this block so that links that go up in the linearization are not added
-          //to the global names index. This requires that the "Model" view in the explorer can
-          //load the linearization and resolve the links there.
-          if(idx == 0 || page != p.no) {
-            val jo = allModels(l.target)
-            jo("name") orElse { jo("qName") map { q => qNameToName(q.asInstanceOf[String]) } } foreach { case n: String =>
-              globalNames += page+","+idx -> n
-            }
-          }
-        }
         parentIdx map { case (page, idx) => JArray(Seq(page, idx)) } headOption
       }
       localOrParentIdx getOrElse {

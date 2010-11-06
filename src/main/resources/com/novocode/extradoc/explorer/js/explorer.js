@@ -31,7 +31,12 @@ View.scrollToEntity = function(entity) {
   view.contentJ.scrollTop(pos);
 };
 
-View.showMessage = function(msg) { View.msg.show(t(msg)); }
+View.showMessage = function(msg) { View.msg.show(t(msg)); };
+
+View.withMessage = function(msg, cont) {
+  View.showMessage(msg);
+  setTimeout(cont, 0);
+};
 
 View.prototype.show = function(node, showing) {
   if(node) this.contentJ.empty().append(node);
@@ -42,10 +47,7 @@ View.prototype.show = function(node, showing) {
   this.contentJ.css("visibility", "visible");
 };
 
-View.prototype.isShowing = function(showing) {
-  //log("View is showing "+this.showing);
-  return this.showing && this.showing == showing;
-};
+View.prototype.isShowing = function(showing) { return this.showing && this.showing == showing; };
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -273,13 +275,45 @@ Page.prototype.hasDOM = function(view) {
   if(view == "model") return !!this.modelDOM;
   else if(view == "source") return !!this.sourceDOM;
   else return !!this.pageDOM;
-}
+};
 
 Page.prototype.createOrGetDOM = function(view, cont) {
   if(view == "model") this.createOrGetModelDOM(cont);
   else if(view == "source") this.createOrGetSourceDOM(cont);
   else this.createOrGetPageDOM(cont);
-}
+};
+
+Page.prototype.loadDependencies = function(cont) {
+  var that = this;
+  var base = this.model[0], pagesNeeded = [];
+  if(base.linearization) {
+    for(var i=0; i<base.linearization.length; i++) {
+      var lin = base.linearization[i];
+      if(typeof lin === "object" && lin.hasOwnProperty("length") && lin[0] != this.model._no)
+        pagesNeeded[pagesNeeded.length] = lin[0];
+    }
+  }
+  if(pagesNeeded.length) View.showMessage("Loading "+pagesNeeded.length+" additional models...");
+  loadAuxModels(pagesNeeded, function(aux) {
+    that.models = aux;
+    aux[that.no] = that.model;
+    cont();
+  });
+};
+
+Page.prototype.removeDependencies = function() { delete this.models; };
+
+Page.prototype.resolve = function(o) { return o._isLink ? this.models[o[0]][o[1]] : o; };
+
+Page.prototype.nameFor = function(o) {
+  if(o._isLink) {
+    if(o[0] == this.no) return this.model[o[1]].name;
+    var n = ex.global.names[o[0]+","+o[1]]
+    if(n) return n;
+    var m = this.models[o[0]];
+    return m ? m[o[1]].name : null;
+  } else o.name;
+};
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -288,13 +322,11 @@ Page.prototype.createOrGetDOM = function(view, cont) {
 
 Page.prototype.createOrGetPageDOM = function(cont) {
   var that = this;
-  var models = null;
 
   function appendLink(o, node) {
     var aE = e("a", { href: "#" }, node);
     aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
-    if(o[0] == that.no) t(that.model[o[1]].name, aE);
-    else t(ex.global.names[o[0]+","+o[1]], aE);
+    t(that.nameFor(o), aE);
   }
 
   function appendXName(o, node) {
@@ -342,12 +374,10 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     if(s) t(s, node);
   }
 
-  function resolve(o) { return o._isLink ? models[o[0]][o[1]] : o; }
-
   function appendTypeParam(tp, node) {
     if(typeof tp === "string") t(tp, node);
     else {
-      tp = resolve(tp);
+      tp = that.resolve(tp);
       t(tp.variance ? tp.variance + tp.name : tp.name, node);
       if(tp.lo) {
         t(" >: ", node);
@@ -369,8 +399,7 @@ Page.prototype.createOrGetPageDOM = function(cont) {
       var el = e(elName, { "class": cls ? "link " + cls : "link" }, node);
       var aE = e("a", { href: "#" }, el);
       aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
-      if(o[0] == that.no) t(that.model[o[1]].name, aE);
-      else t(ex.global.names[o[0]+","+o[1]], aE);
+      t(that.nameFor(o), aE);
     } else {
       var el = e(elName, { "class": cls ? "html " + cls : "html" }, node);
       $(el).append(o._html); //TODO Hook up links
@@ -437,7 +466,7 @@ Page.prototype.createOrGetPageDOM = function(cont) {
       var defE = appendDefTable("Type Parameters", "tparams");
       var numTPs = 0;
       for(var i=0; i<o.typeParams.length; i++) {
-        var tp = resolve(o.typeParams[i]);
+        var tp = that.resolve(o.typeParams[i]);
         if((typeof tp !== "string") && tp.doc) {
           appendDefLine(tp.name, tp.doc, defE);
           numTPs++;
@@ -462,34 +491,13 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     cont(that.pageDOM);
   }
 
-  function loadAuxAndCreate(o) {
-    var pagesNeeded = [];
-    if(o.linearization) {
-      for(var i=0; i<o.linearization.length; i++) {
-        var lin = o.linearization[i];
-        if(typeof lin === "object" && lin.hasOwnProperty("length") && lin[0] != that.model._no)
-          pagesNeeded[pagesNeeded.length] = lin[0];
-      }
-    }
-    if(pagesNeeded.length) {
-      View.showMessage("Loading "+pagesNeeded.length+" additional models...");
-      loadAuxModels(pagesNeeded, function(aux) {
-        models = aux;
-        models[that.no] = that.model;
-        createPageDOM(o);
-      });
-    }
-    else createPageDOM(o);
-  }
-
-  function createPackagePageDOM() {
-    that.pageDOM = t("Package pages not implemented yet.");
-    cont(that.pageDOM);
-  }
-
   if(this.pageDOM) cont(this.pageDOM);
-  /*if(this.model[0].isPackage) createPackagePageDOM();
-  else*/ loadAuxAndCreate(this.model[0]);
+  else this.loadDependencies(function() {
+    View.withMessage("Creating view...", function() {
+      createPageDOM(that.model[0]);
+      that.removeDependencies();
+    });
+  });
 }
 
 
@@ -544,8 +552,7 @@ Page.prototype.createOrGetModelDOM = function(cont) {
       var spanE = e("span");
       var aE = e("a", { href: "#" }, spanE);
       aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
-      if(o[0] == that.no) t(that.model[o[1]].name, aE);
-      else t(ex.global.names[o[0]+","+o[1]], aE);
+      t(that.nameFor(o), aE);
       t((o[0] == that.no ? "\u2192 " : "\u2197 ")+o[0]+", "+o[1], e("span", { "class": "entityno" }, spanE));
       return spanE;
     }
@@ -587,11 +594,17 @@ Page.prototype.createOrGetModelDOM = function(cont) {
       var liE = e("li", null, olE);
       liE.appendChild(createObjectDOM(page[i], i));
     }
-    return divE;
+    that.modelDOM = divE;
+    cont(divE);
   };
 
-  if(!this.modelDOM) this.modelDOM = createModelDOM(this.model);
-  cont(this.modelDOM);
+  if(this.modelDOM) cont(this.modelDOM);
+  else this.loadDependencies(function() {
+    View.withMessage("Creating view...", function() {
+      createModelDOM(that.model);
+      that.removeDependencies();
+    });
+  });
 };
 
 
@@ -669,9 +682,7 @@ function loadPage(no, entity, view) {
     });
   }
   var cached = pageCache.getItem("p"+no);
-  if(cached) View.showMessage("Rendering page "+no+"...");
-  else View.showMessage("Loading and rendering page "+no+"...");
-  setTimeout(function() {
+  View.withMessage((cached ? "Rendering page " : "Loading and rendering page ")+no+"...", function() {
     if(cached) ok(cached);
     else {
       var t0 = (new Date).getTime();
@@ -688,7 +699,7 @@ function loadPage(no, entity, view) {
           View.showMessage(errmsg);
         });
     }
-  }, 0);
+  });
 }
 
 function showEntity(params) {
