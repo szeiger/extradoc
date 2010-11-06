@@ -21,24 +21,24 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     val (allModels, allModelsReverse) = buildModels(universe)
     if(simpleParamsAsString) inlineSimpleParams(allModels, allModelsReverse)
     while(allModels.size > allModelsReverse.size) compact(allModels, allModelsReverse)
-    if(doInline) inline(allModels, allModelsReverse)
-    if(allModels.keys.max + 1 != allModels.size) renumber(allModels, allModelsReverse)
+    if(doInline) inline(allModels)
+    if(allModels.keys.max + 1 != allModels.size) renumber(allModels)
     if(allModels.keys.max + 1 != allModels.size)
       throw new RuntimeException("Renumbering failed: Max key "+allModels.keys.max+" for size "+allModels.size)
     val (verOk, _) = verify(allModels)
     if(!verOk) throw new RuntimeException("Model verification failed")
-    (allModels, allModelsReverse)
+    allModels
   }
 
   def buildModels(universe: Universe) = {
     val globalEntityOrdinals = new mutable.HashMap[EntityHash[Entity], Int]
-    val allModels = new mutable.HashMap[Int, JBase]
-    val allModelsReverse = new mutable.HashMap[JBase, Int]
+    val allModels = new mutable.HashMap[Int, JObject]
+    val allModelsReverse = new mutable.HashMap[JObject, Int]
     val builder = new JsonBuilder[Link] {
       val typeEntitiesAsHtml = self.typeEntitiesAsHtml
       val compactFlags = self.compactFlags
       val removeSimpleBodyDocs = self.removeSimpleBodyDocs
-      def global[T <: Entity](e: T)(f: T => JBase) = globalEntityOrdinals.get(EntityHash(e)) match {
+      def global[T <: Entity](e: T)(f: T => JObject) = globalEntityOrdinals.get(EntityHash(e)) match {
         case Some(ord) => Link(ord)
         case None =>
           val ord = globalEntityOrdinals.size
@@ -68,7 +68,7 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     (allModels, allModelsReverse)
   }
 
-  def verify(m: mutable.HashMap[Int, JBase]): (Boolean, Int) = {
+  def verify(m: mutable.HashMap[Int, JObject]): (Boolean, Int) = {
     println("Verifying JSON model")
     var ok = true
     var count = 0
@@ -94,7 +94,7 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     (ok, count)
   }
 
-  def compact(allModels: mutable.HashMap[Int, JBase], allModelsReverse: mutable.HashMap[JBase, Int]) {
+  def compact(allModels: mutable.HashMap[Int, JObject], allModelsReverse: mutable.HashMap[JObject, Int]) {
     val duplicates = allModels.keys.toSet -- allModelsReverse.values
     val repl = duplicates map { i => (Link(i), Link(allModelsReverse(allModels(i)))) } toMap;
     println("Replacing duplicates: " + repl)
@@ -109,35 +109,33 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     println("Compacted to "+allModels.size+" global objects ("+allModelsReverse.size+" unique)")
   }
 
-  def inlineSimpleParams(allModels: mutable.HashMap[Int, JBase], allModelsReverse: mutable.HashMap[JBase, Int]) {
+  def inlineSimpleParams(allModels: mutable.HashMap[Int, JObject], allModelsReverse: mutable.HashMap[JObject, Int]) {
     def simple(l: Int) = {
-      val j = allModels(l).asInstanceOf[JObject]
+      val j = allModels(l)
       if(j.keys.toSet -- Set("name", "qName") isEmpty)
         nameFor(j) filter { _.length < 7 }
       else None
     }
-    allModels.values foreach {
-      case j: JObject =>
-        j("typeParams", JArray.Empty) transform {
-          case (_, l @ Link(t)) => simple(t) getOrElse l
-          case (_, o) => o
-        }
-        /* j("valueParams", JArray.Empty).values foreach {
-          case a: JArray =>
-            a transform {
-              case (_, l @ Link(t)) => simple(t) getOrElse l
-              case (_, o) => o
-            }
-          case _ =>
-        } */
-      case _ =>
+    allModels.values foreach { j =>
+      j("typeParams", JArray.Empty) transform {
+        case (_, l @ Link(t)) => simple(t) getOrElse l
+        case (_, o) => o
+      }
+      /* j("valueParams", JArray.Empty).values foreach {
+        case a: JArray =>
+          a transform {
+            case (_, l @ Link(t)) => simple(t) getOrElse l
+            case (_, o) => o
+          }
+        case _ =>
+      } */
     }
     allModelsReverse.clear
     for((ord, j) <- allModels) allModelsReverse += j -> ord
     println("Compacted to "+allModels.size+" global objects ("+allModelsReverse.size+" unique)")
   }
 
-  def renumber(allModels: mutable.HashMap[Int, JBase], allModelsReverse: mutable.HashMap[JBase, Int]) {
+  def renumber(allModels: mutable.HashMap[Int, JObject]) {
     println("Renumbering objects")
     val repl = allModels.keys.toSeq.sorted.zipWithIndex.toMap
     val linkRepl = repl map { case (k,v) => (Link(k), Link(v)) }
@@ -149,23 +147,16 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     val newM = allModels.toSeq map { case (ord, j) => (repl(ord), j) };
     allModels.clear
     allModels ++= newM
-    allModelsReverse.clear
-    for((ord, j) <- allModels) allModelsReverse += j -> ord
   }
 
-  def findGlobal(allModels: mutable.HashMap[Int, JBase]) = {
+  def findGlobal(allModels: mutable.HashMap[Int, JObject]) = {
     val global = new mutable.HashSet[Int]
     def f(ord: Int) {
       if(!(global contains ord)) {
         global += ord
-        allModels(ord) match {
-          case j: JObject =>
-            j("templates") foreach { o =>
-              o.asInstanceOf[JArray].values foreach { v =>
-                f(v.asInstanceOf[Link].target)
-              }
-            }
-          case _ =>
+        val j = allModels(ord)
+        j("templates", JArray.Empty).values foreach { v =>
+          f(v.asInstanceOf[Link].target)
         }
       }
     }
@@ -173,17 +164,15 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     global
   }
 
-  def inline(allModels: mutable.HashMap[Int, JBase], allModelsReverse: mutable.HashMap[JBase, Int]) {
+  def inline(allModels: mutable.HashMap[Int, JObject]) {
     println("Finding objects to inline")
     val keep = findGlobal(allModels)
     allModels.values foreach {
       _ foreachRec {
         _ match {
           case j: JObject =>
-            j("_links") foreach {
-              _.asInstanceOf[JArray].values foreach {
-                keep += _.asInstanceOf[Link].target
-              }
+            j("_links", JArray.Empty).values foreach {
+              keep += _.asInstanceOf[Link].target
             }
           case _ =>
         }
@@ -208,8 +197,6 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
         j.children map { replaceIn _ }
       }
       allModels.values foreach { replaceIn _ }
-      allModelsReverse.clear
-      for((ord, j) <- allModels) allModelsReverse += j -> ord
     }
   }
 

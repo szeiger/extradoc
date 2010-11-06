@@ -15,7 +15,7 @@ abstract class JsonBuilder[Link : CanBeValue] {
 
   val mergeInheritedMembers = true
 
-  def global[T <: Entity](e: T)(f: T => JBase): Link
+  def global[T <: Entity](e: T)(f: T => JObject): Link
 
   def as[T](o: AnyRef)(f: T => Unit)(implicit m: ClassManifest[T]): Unit =
     if(m.erasure.isInstance(o)) f(o.asInstanceOf[T])

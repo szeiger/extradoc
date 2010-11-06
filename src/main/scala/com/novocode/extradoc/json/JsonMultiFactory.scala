@@ -37,7 +37,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       copyResource(p, "images/ajax-loader-white.gif")
     }
 
-    val (allModels, _) = prepareModel(universe)
+    val allModels = prepareModel(universe)
 
     aliasComments(allModels)
 
@@ -46,11 +46,11 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     def findPage(ord: Int, j: JBase): Option[Page] = j match {
       case j: JObject =>
         val isPage = pages contains ord
-        val isPackage = j("isPackage", false) || j("is", "").contains('p')
-        def isObject = j("isObject", false) || j("is", "").contains('b')
+        val isPackage = j !! "isPackage" || j("is", "").contains('p')
+        def isObject = j !! "isObject" || j("is", "").contains('b')
         lazy val parent = j("inTemplate") collect { case Link(t) => allModels(t) }
         def parentIsTemplate = parent collect { case par: JObject =>
-          par("isTemplate", false) || par("is", "").contains('M')
+          par !! "isTemplate" || par("is", "").contains('M')
         } getOrElse false
         def isInParent = parent collect { case par: JObject =>
           (par("values", JArray.Empty).values ++ par("methods", JArray.Empty).values) contains Link(ord)
@@ -100,10 +100,8 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       _ foreachRec {
         _ match {
           case j: JObject =>
-            j("_links") foreach {
-              _.asInstanceOf[JArray].values foreach {
-                keepHtmlLinks += _.asInstanceOf[Link].target
-              }
+            j("_links", JArray.Empty).values foreach {
+              keepHtmlLinks += _.asInstanceOf[Link].target
             }
           case _ =>
         }
@@ -113,7 +111,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     println("Removing extra objects which are duplicated further up the linarization")
     var removedExtras = 0
     pages.values foreach { p =>
-      allModels(p.main).asInstanceOf[JObject].apply("linearization", JArray.Empty).values foreach {
+      allModels(p.main).apply("linearization", JArray.Empty).values foreach {
         case Link(l) if l != p.main =>
           pages get l foreach { p2 =>
             var s = p.objects.size
@@ -131,7 +129,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     allModels.values foreach {
       _ foreachRec {
         _.links foreach { l =>
-          val j = allModels(l.target).asInstanceOf[JObject]
+          val j = allModels(l.target)
           if((extra contains l.target) && !(keepHtmlLinks contains l.target) && !(isDef(j) || isVal(j)))
             counts += l.target -> (counts.getOrElse(l.target, 0) + 1)
         }
@@ -176,7 +174,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     def convertLink(p: Page)(l: Link) = {
       val localIdx: Option[Int] = p.renumberedMap get l.target
       val localOrParentIdx: Option[Any] = localIdx orElse {
-        val lin = allModels(p.main).asInstanceOf[JObject].apply("linearization", JArray.Empty).values;
+        val lin = allModels(p.main).apply("linearization", JArray.Empty).values;
         val parentIdx = lin.toSeq.view flatMap {
           case Link(t2) =>
             pages get t2 flatMap { p2 => p2.renumberedMap get l.target map { (p2.no, _) } }
@@ -187,7 +185,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
           //to the global names index. This requires that the "Model" view in the explorer can
           //load the linearization and resolve the links there.
           if(idx == 0 || page != p.no) {
-            val jo = allModels(l.target).asInstanceOf[JObject]
+            val jo = allModels(l.target)
             jo("name") orElse { jo("qName") map { q => qNameToName(q.asInstanceOf[String]) } } foreach { case n: String =>
               globalNames += page+","+idx -> n
             }
@@ -198,7 +196,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       localOrParentIdx getOrElse {
         val (page, idx) = remappedIDs(l)
         if(idx == 0 || page != p.no) {
-          val jo = allModels(l.target).asInstanceOf[JObject]
+          val jo = allModels(l.target)
           jo("name") orElse { jo("qName") map { q => qNameToName(q.asInstanceOf[String]) } } foreach { case n: String =>
             globalNames += page+","+idx -> n
           }
@@ -212,9 +210,9 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       }
     }
 
-    val pageObjects = pages.values map { p => (p.no, (allModels(p.main).asInstanceOf[JObject], p.main)) }
+    val pageObjects = pages.values map { p => (p.no, (allModels(p.main), p.main)) }
     val allPackages = pageObjects filter { case (_, (j, _)) =>
-      j("isPackage").getOrElse(false) == true || j("is").getOrElse("").asInstanceOf[String].contains('p')
+      j("isPackage").getOrElse(false) == true || j("is", "").contains('p')
     } toMap
     val linearPackages = allPackages.toSeq sortBy { case (_, (j, _)) => j("qName").get.asInstanceOf[String] }
     println("Writing global.json")
@@ -230,9 +228,9 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
         val tlChildren = children map { case (ord, j: JObject) =>
           val is = j("is", "")
           val kind =
-            if(j("isClass", false) || is.contains('c')) 'c'
-            else if(j("isTrait", false) || is.contains('t')) 't'
-            else if(j("isObject", false) || is.contains('b')) 'b'
+            if(j !! "isClass" || is.contains('c')) 'c'
+            else if(j !! "isTrait" || is.contains('t')) 't'
+            else if(j !! "isObject" || is.contains('b')) 'b'
             else '_'
           (ord, j, kind)
         } filter { case (ord, _, kind) => (pages contains ord) && (kind != '_') } toSeq;
@@ -269,18 +267,18 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     }
   }
 
-  def aliasComments(allModels: mutable.HashMap[Int, JBase]) {
+  def aliasComments(allModels: mutable.HashMap[Int, JObject]) {
     println("Aliasing repeated comments")
     def forMembers(j: JObject)(f: (JObject, Link) => Unit) {
       j("values", JArray.Empty).values ++ j("methods", JArray.Empty).values foreach {
-        case l: Link => f(allModels(l.target).asInstanceOf[JObject], l)
+        case l: Link => f(allModels(l.target), l)
         case _ =>
       }
     }
     def findComment(c: JObject, templates: List[Link], notIn: Link): Option[Link] = templates match {
       case t :: ts => findComment(c, ts, notIn) orElse {
         var found: Option[Link] = None
-        forMembers(allModels(t.target).asInstanceOf[JObject]) { (member, memberLink) =>
+        forMembers(allModels(t.target)) { (member, memberLink) =>
           if(memberLink != notIn) {
             member("comment") foreach {
               case mc: JObject =>
@@ -315,7 +313,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     println("Aliased "+count+" comments")
   }
 
-  def isDef(j: JObject) = j("isDef", false) || j("is", "").contains('d')
-  def isVal(j: JObject) = j("isVal", false) || j("is", "").contains('v') || j("isLazyVal", false) || j("is", "").contains('l')
-  def isAliasType(j: JObject) = j("isAliasType", false) || j("is", "").contains('a')
+  def isDef(j: JObject) = j !! "isDef" || j("is", "").contains('d')
+  def isVal(j: JObject) = j !! "isVal" || j("is", "").contains('v') || j !! "isLazyVal" || j("is", "").contains('l')
+  def isAliasType(j: JObject) = j !! "isAliasType" || j("is", "").contains('a')
 }

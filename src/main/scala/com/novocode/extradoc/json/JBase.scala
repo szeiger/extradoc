@@ -125,6 +125,10 @@ sealed class JObject extends JBase {
     case _ => default
   }
   def keys = m.keys.iterator
+  def !! (k: String) = m get k match {
+    case None | Some("") | Some(0) | Some(false) => false
+    case _ => true
+  }
 }
 
 object JObject {
