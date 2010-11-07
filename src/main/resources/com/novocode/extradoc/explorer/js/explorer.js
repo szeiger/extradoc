@@ -42,8 +42,11 @@ View.prototype.show = function(node, showing) {
   if(node) this.contentJ.empty().append(node);
   if(showing) this.showing = showing;
   if(View.currentID == this.id) return;
+  //View[View.currentID].contentJ.data("saved", $(":first", View[View.currentID].contentJ).detach());
   View[View.currentID].contentJ.css("visibility", "hidden");
   View.currentID = this.id;
+  //if(node) this.contentJ.data("saved", null);
+  //else this.contentJ.empty().append(this.contentJ.data("saved"));
   this.contentJ.css("visibility", "visible");
 };
 
@@ -285,12 +288,14 @@ Page.prototype.createOrGetDOM = function(view, cont) {
 
 Page.prototype.loadDependencies = function(cont) {
   var that = this;
-  var base = this.model[0], pagesNeeded = [];
+  var base = this.model[0], pagesNeeded = [], seen = {};
   if(base.linearization) {
     for(var i=0; i<base.linearization.length; i++) {
       var lin = base.linearization[i];
-      if(typeof lin === "object" && lin.hasOwnProperty("length") && lin[0] != this.model._no)
+      if(typeof lin === "object" && lin.hasOwnProperty("length") && lin[0] != this.model._no && !seen[lin[0]]) {
+        seen[lin[0]] = true;
         pagesNeeded[pagesNeeded.length] = lin[0];
+      }
     }
   }
   if(pagesNeeded.length) View.showMessage("Loading "+pagesNeeded.length+" additional models...");
@@ -514,7 +519,9 @@ Page.prototype.createOrGetModelDOM = function(cont) {
     if(o._isEntity) {
       var trE = e("tr", null, tbodyE);
       var thE = e("th", { colspan: 2, "class": "entityhead" }, trE);
-      t(o.name, e("span", null, thE));
+      var thSpanE = e("span", null, thE);
+      if(no || no === 0) t(no+"", e("span", null, thSpanE));
+      t(o.name, thSpanE);
       t(o.qName || "", thE);
     }
     var is = null;
@@ -589,11 +596,7 @@ Page.prototype.createOrGetModelDOM = function(cont) {
     var divE = e("div");
     t("p"+page._no+".json: "+(page.length == 1 ? "1 entity, " : (page.length+" entities, "))+
       (page._bytes/1024).toFixed(0)+" kB (+ "+(ex.global._bytes/1024).toFixed(0)+" kB global)", e("h1", null, divE));
-    var olE = e("ol", { "class": "page", start: 0 }, divE);
-    for(var i=0; i<page.length; i++) {
-      var liE = e("li", null, olE);
-      liE.appendChild(createObjectDOM(page[i], i));
-    }
+    for(var i=0; i<page.length; i++) divE.appendChild(createObjectDOM(page[i], i));
     that.modelDOM = divE;
     cont(divE);
   };
@@ -731,7 +734,7 @@ $(function() {
   log("Extradoc Explorer starting");
   new View("page"); new View("model"); new View("source"); new View("msg");
   new Tab("page"); new Tab("model"); new Tab("source"); Tab.loader = $("#loader img");
-  var navigation = $("#navigation"), contentJ = $("#content");
+  var sidebar = $("#sidebar"), navigation = $("#navigation"), contentJ = $("#content");
   var inClick = false;
   var rememberedPos = 300;
   var separator = $("#separator").draggable({
@@ -750,7 +753,9 @@ $(function() {
   var sepBorderColor = separator.css("border-left-color");
   var sepHandleColor = separatorDiv.css("background-color");
   function syncSeparator(pos) {
-    navigation.css("width", pos);
+    if($.browser.msie)
+      sidebar.css("overflow", pos > 0 ? "auto" : "hidden"); // IE8 does not hide scrollbars otherwise
+    sidebar.css("width", pos);
     contentJ.css("left", pos+1);
     separator.css("border-left-color", pos ? sepBorderColor : "transparent");
     separatorDiv.css("border-left-color", pos ? sepBorderColor : sepHandleColor);

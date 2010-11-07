@@ -166,9 +166,9 @@ a:hover, a:active {
   height: 16px;
 }
 
-/* Navigation Area **********************************************************/
+/* Sidebar with Navigation Area *********************************************/
 
-#navigation {
+#sidebar {
   position: absolute;
   top: 28px;
   left: 0;
@@ -176,6 +176,26 @@ a:hover, a:active {
   width: 300px;
   background: white;
   overflow: auto;
+}
+
+#search_area {
+  width: 100%;
+  padding: 8px 4px;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+
+#search {
+  width: 100%;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -ms-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+
+#navigation {
 }
 
 #navigation ul.packages {
@@ -427,7 +447,7 @@ a:hover, a:active {
   font-style: italic;
 }
 
-#content noscript {
+#content noscript div {
   position: absolute;
   left: 24px;
   right: 24px;
@@ -548,6 +568,10 @@ a:hover, a:active {
 
 /* Content Area: Model Tab **************************************************/
 
+#content_model > div {
+  padding-bottom: 1px; // Force IE to use margin for ol.page
+}
+
 #content_model > div > h1 {
   font-size: inherit;
   font-weight: inherit;
@@ -560,10 +584,6 @@ a:hover, a:active {
   border-bottom: 1px solid #c0c0c0;
 }
 
-#content_model ol.page {
-  margin: 18px;
-}
-
 #content_model table.object {
   border: 1px solid #c0c0c0;
   -webkit-border-radius: 6px;
@@ -572,6 +592,7 @@ a:hover, a:active {
   box-shadow: 2px 2px 3px #e0e0e0;
   -moz-box-shadow: 2px 2px 3px #e0e0e0;
   -webkit-box-shadow: 2px 2px 3px #e0e0e0;
+  margin: 18px;
 }
 
 #content_model table.object th {
@@ -593,10 +614,6 @@ a:hover, a:active {
 
 #content_model table.object td, table.object th {
   padding: 6px 8px;
-}
-
-#content_model ol.page > li {
-  margin-bottom: 0.5em;
 }
 
 #content_model div.html {
@@ -639,6 +656,19 @@ a:hover, a:active {
   float: left;
   padding-right: 24px;
   color: #000000;
+}
+
+#content_model table.object th.entityhead > span > span {
+  background-color: #f8f8f8;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #ffffff), color-stop(1, #e8e8e8));
+  background-image: -moz-linear-gradient(center top, #ffffff 0%, #e8e8e8 100%);
+  border: 1px solid #c0c0c0;
+  -webkit-border-radius: 6px;
+  -moz-border-radius: 6px;
+  border-radius: 6px;
+  padding: 0 6px;
+  margin-right: 12px;
+  font-size: 12px;
 }
 
 #content_model span.entityno {
@@ -691,7 +721,12 @@ a:hover, a:active {
   padding: 2px 15px 0px 9px;
 }
 
+#content_source .browser > .head td {
+  vertical-align: middle;
+}
+
 #content_source .browser > .head th {
+  vertical-align: middle;
   font-weight: normal;
   padding-right: 6px;
 }
