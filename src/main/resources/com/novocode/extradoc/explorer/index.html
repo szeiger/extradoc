@@ -24,9 +24,14 @@
 </tr></table>
 <div id="sidebar">
   <div id="search_area">
-    <input type="search" id="search" name="search" autocomplete="on" autofocus="on" placeholder="Search" />
+    <table cellpadding="0" cellspacing="0"><tr>
+      <td><img src="images/search.png" alt="" /></td>
+      <td width="100%"><input type="text" id="search" name="search" autocomplete="on" placeholder="Search / Filter" /></td>
+      <td><span title="Reset Search">X</span></td>
+    </table>
   </div>
   <div id="navigation"></div>
+  <div id="navfooter"><div>Created with <a href="http://github.com/szeiger/extradoc">Extradoc</a></div></div>
 </div>
 <div id="separator"><div></div></div>
 <div id="content">
@@ -36,5 +41,19 @@
   <div id="content_model"></div>
   <div id="content_source"></div>
 </div>
-
+<div id="search_help">
+  <img src="images/tooltip-triangle.png" alt="" />
+  <div>
+    <h3>Search this API <span>(Keyboard shortcut: f)</span></h3>
+    <ul>
+      <li>Type a part of a template name to search for templates (traits, classes, objects and packages which
+        are listed in the navigation area), e.g.
+        <pre>map</pre>
+      </li>
+      <li>Type a dot and a part of a member name to search for members (defs, vars, vals, types), e.g.
+        <pre>.map</pre>
+      </li>
+    </ul>
+  </div>
+</div>
 </body></html>

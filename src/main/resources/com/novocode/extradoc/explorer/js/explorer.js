@@ -22,10 +22,10 @@ View.scrollToEntity = function(entity) {
   var view = View[View.currentID];
   var pos = 0;
   if(entity > 0) {
-    var epos = $($("ol.page > li")[entity]).position();
+    var epos = $($("#content_model > div > table")[entity]).position();
     if(epos) {
       pos = epos.top;
-      pos += view.contentJ.scrollTop() - 6;
+      pos += view.contentJ.scrollTop();
     }
   }
   view.contentJ.scrollTop(pos);
@@ -243,9 +243,6 @@ function createNavigationDOM() {
   };
   for(var i=0; i<packages.length; i++)
     if(packages[i].n !== "_root_") createPackageDOM(packages[i]);
-  var footerE = e("div", null, e("div", { "id": "navfooter" }, divE));
-  t("Created with ", footerE);
-  t("Extradoc", e("a", { href: "http://github.com/szeiger/extradoc" }, footerE));
   return divE;
 }
 
@@ -522,7 +519,7 @@ Page.prototype.createOrGetModelDOM = function(cont) {
       var thSpanE = e("span", null, thE);
       if(no || no === 0) t(no+"", e("span", null, thSpanE));
       t(o.name, thSpanE);
-      t(o.qName || "", thE);
+      if(o.qName && o.qName !== o.name) t(o.qName, thE);
     }
     var is = null;
     if(o._isEntity) {
@@ -735,6 +732,7 @@ $(function() {
   new View("page"); new View("model"); new View("source"); new View("msg");
   new Tab("page"); new Tab("model"); new Tab("source"); Tab.loader = $("#loader img");
   var sidebar = $("#sidebar"), navigation = $("#navigation"), contentJ = $("#content");
+  var searchHelp = $("#search_help");
   var inClick = false;
   var rememberedPos = 300;
   var separator = $("#separator").draggable({
@@ -757,18 +755,72 @@ $(function() {
       sidebar.css("overflow", pos > 0 ? "auto" : "hidden"); // IE8 does not hide scrollbars otherwise
     sidebar.css("width", pos);
     contentJ.css("left", pos+1);
+    searchHelp.css("left", pos-27);
     separator.css("border-left-color", pos ? sepBorderColor : "transparent");
     separatorDiv.css("border-left-color", pos ? sepBorderColor : sepHandleColor);
   }
+  function toggleSidebar() {
+    var pos = separator.css("left") !== "0px" ? 0 : rememberedPos;
+    separator.css("left", pos);
+    syncSeparator(pos);
+  };
   separatorDiv.mousedown(function() {
     inClick = true;
     return true;
   }).click(function() {
     if(!inClick) return false;
     inClick = false;
-    var pos = separator.css("left") !== "0px" ? 0 : rememberedPos;
-    separator.css("left", pos);
-    syncSeparator(pos);
+    toggleSidebar();
+  });
+  var searchInput = $("#search"), searchTable = $("#search_area table");
+  searchInput.focus(function() {
+    searchTable.toggleClass("active", true);
+    sidebar.scrollTop(0);
+    searchHelp.show();
+  });
+  searchInput.blur(function() {
+    searchTable.toggleClass("active", false);
+    searchHelp.hide();
+  });
+  $("html").keypress(function(e) {
+    if(e.srcElement && e.srcElement.nodeName === "INPUT") return true;
+    if(e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return true;
+    switch(e.charCode || e.keyCode) {
+      case 102: // f
+        if(separator.attr("offsetLeft") < 200) {
+          var pos = rememberedPos > 200 ? rememberedPos : 200;
+          separator.css("left", pos);
+          syncSeparator(pos);
+        }
+        searchInput.focus();
+        return false;
+      case 110: // n
+        toggleSidebar();
+        return false;
+      case 112: // p
+        goToEntity(null, null, "page");
+        return false;
+      case 109: // m
+        goToEntity(null, null, "model");
+        return false;
+      case 115: // s
+        goToEntity(null, null, "source");
+        return false;
+      default:
+        return true;
+    }
+  });
+  searchInput.keydown(function(e) {
+    if(e.keyCode === 27) {
+      searchInput.blur();
+      return false;
+    } else return true;
+  });
+  searchInput.keypress(function(e) {
+    if(e.keyCode === 13) {
+      log('TODO: Perform search for "'+searchInput.val()+'"');
+      return false;
+    } else return true;
   });
 
   function globalReady(global) {

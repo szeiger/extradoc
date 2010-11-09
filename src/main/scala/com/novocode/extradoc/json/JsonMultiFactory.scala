@@ -35,6 +35,8 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       copyResource(p, "js/jquery-ui-1.8.5.custom.min.js")
       copyResource(p, "js/jquery.history.js")
       copyResource(p, "images/ajax-loader-white.gif")
+      copyResource(p, "images/search.png")
+      copyResource(p, "images/tooltip-triangle.png")
     }
 
     val allModels = prepareModel(universe)

@@ -25,6 +25,10 @@ a:hover, a:active {
   text-decoration: underline;
 }
 
+code, pre {
+  font-family: Consolas,monospace;
+}
+
 /* Header *******************************************************************/
 
 #header {
@@ -180,22 +184,72 @@ a:hover, a:active {
 
 #search_area {
   width: 100%;
-  padding: 8px 4px;
+  padding: 8px;
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -ms-box-sizing: border-box;
   -webkit-box-sizing: border-box;
 }
+
+#search_area table {
+  border: 1px solid #b0b0b0;
+  width: 100%;
+  -webkit-border-radius: 13px;
+  -moz-border-radius: 13px;
+  border-radius: 13px;
+}
+
+#search_area table.active {
+  border-color: #5096ff;
+  box-shadow: 0 0 3px #5096ff;
+  -moz-box-shadow: 0 0 3px #5096ff;
+  -webkit-box-shadow: 0 0 3px #5096ff;
+}
+
+#search_area table td > * { display: block; }
+
+#search_area img {
+  padding-left: 5px;
+  opacity: 0.6;
+}
+
+#search_area table.active img { opacity: 1; }
+
+#search_area span {
+  margin-right: 4px;
+  cursor: pointer;
+  -webkit-border-radius: 8px;
+  -moz-border-radius: 8px;
+  border-radius: 8px;
+  width: 16px;
+  height: 16px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 16px;
+  color: white;
+  font-weight: bold;
+  background-color: #b0b0b0;
+}
+
+#search_area table.active span { background-color: #c08080; }
+
+#search_area span:hover, #search_area span:active { background-color: #c05050 !important; }
 
 #search {
+  margin: 0;
   width: 100%;
+  line-height: 14px;
+  height: 22px;
+  border: 0;
+  padding: 4px;
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -ms-box-sizing: border-box;
   -webkit-box-sizing: border-box;
 }
 
-#navigation {
+#search:focus {
+  outline: none;
 }
 
 #navigation ul.packages {
@@ -408,12 +462,12 @@ a:hover, a:active {
 }
 
 #separator div:active, #separator div:hover {
-  background: #a9dbf6;
-  background-image: -webkit-gradient(linear, left top, right top, color-stop(0, #a9dbf6), color-stop(1, #d6eefb));
-  background-image: -moz-linear-gradient(left center, #a9dbf6 0%, #d6eefb 100%);
-  /*border-top-color: #356f9b;
-  border-right-color: #356f9b;
-  border-bottom-color: #356f9b;*/
+  background: #c0daff;
+  background-image: -webkit-gradient(linear, left top, right top, color-stop(0, #b0c8ff), color-stop(1, #c0daff));
+  background-image: -moz-linear-gradient(left center, #b0c8ff 0%, #c0daff 100%);
+  border-top-color: #6098ff;
+  border-right-color: #6098ff;
+  border-bottom-color: #6098ff;
   box-shadow: 2px 1px 3px #d0d0d0;
   -moz-box-shadow: 2px 1px 3px #d0d0d0;
   -webkit-box-shadow: 2px 1px 3px #d0d0d0;
@@ -560,10 +614,6 @@ a:hover, a:active {
   -webkit-border-radius: 6px;
   -moz-border-radius: 6px;
   border-radius: 6px;
-}
-
-#page code, #page pre {
-  font-family: Consolas,monospace;
 }
 
 /* Content Area: Model Tab **************************************************/
@@ -761,4 +811,78 @@ a:hover, a:active {
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
+}
+
+/* Search Help Overlay ******************************************************/
+
+#search_help {
+  position: absolute;
+  left: 273px;
+  right: 20px;
+  top: 35px;
+  z-index: 1;
+  display: none;
+}
+
+#search_help > img {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  z-index: 2;
+}
+
+#search_help > div {
+  position: absolute;
+  left: 9px;
+  right: 0;
+  top: 0;
+  padding: 15px 15px 10px 10px;
+  border: 1px solid #606060;
+  background-color: #fffff0;
+  z-index: 1;
+  box-shadow: 2px 2px 5px #a0a0a0;
+  -moz-box-shadow: 2px 2px 5px #a0a0a0;
+  -webkit-box-shadow: 2px 2px 5px #a0a0a0;
+  -webkit-border-radius: 7px;
+  -moz-border-radius: 7px;
+  border-radius: 7px;
+  min-width: 200px;
+  max-width: 400px;
+}
+
+#search_help ul {
+  padding-left: 20px;
+  font-size: 12px;
+}
+
+#search_help pre {
+  display: block;
+  margin: 8px 0 10px 0;
+  border: 1px solid #d0d0c0;
+  padding: 6px 12px;
+  background-color: white;
+  -webkit-border-radius: 12px;
+  -moz-border-radius: 12px;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: bold;
+  color: #404040;
+  height: 12px;
+  line-height: 12px;
+}
+
+#search_help h3 {
+  font-size: 1em;
+  margin: 0 0 0 20px;
+  padding: 0 0 2px 0;
+  border-bottom: 1px solid #c09000;
+  font-weight: bold;
+  color: #404040;
+}
+
+#search_help h3 span {
+  float: right;
+  font-weight: normal;
+  font-size: 12px;
+  margin-left: 8px;
 }
