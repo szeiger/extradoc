@@ -88,6 +88,12 @@ Tab.prototype.setLoading = function(b) {
 
 function log(msg) { if(window.console) console.log(msg); }
 
+function generateID(base) {
+  var cur = generateID.next || 0;
+  generateID.next = cur + 1;
+  return (base || "unique") + "_" + cur;
+}
+
 function e(n, as, p) {
   var n = document.createElement(n);
   if(as)
@@ -198,6 +204,37 @@ function loadAuxModels(nos, done) {
   }
 }
 
+function loadScript(url, cont) {
+  if(loadScript.loaded[url]) { cont(); return; }
+  var callbacks = loadScript.callbacks[url] || (loadScript.callbacks[url] = []);
+  callbacks.push(cont);
+  if(loadScript.loading[url]) return;
+  loadScript.loading[url] = true;
+  log("Loading script "+url+"...");
+  var script = e("script", { "type": "text/javascript", "src": url });
+  script.onload = script.onreadystatechange = function() {
+    if(!loadScript.loaded[url] && (!this.readyState || this.readyState == "loaded" || this.readyState == "complete")) {
+      loadScript.loaded[url] = true;
+      var callbacks2 = loadScript.callbacks[url];
+      if(callbacks2)
+        for(var i=0; i<callbacks2.length; i++) callbacks2[i]();
+      delete loadScript.callbacks[url];
+    }
+  };
+  $("head")[0].appendChild(script);
+}
+loadScript.loaded = {};
+loadScript.loading = {};
+loadScript.callbacks = {};
+
+function loadScripts(urls, cont) {
+  var num = urls.length, count = 0;
+  function f() {
+    if(++count === num) cont();
+  }
+  for(var i=0; i<num; i++) loadScript(urls[i], f);
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 // Create DOM for navigation area
@@ -303,7 +340,7 @@ Page.prototype.loadDependencies = function(cont) {
   });
 };
 
-Page.prototype.removeDependencies = function() { delete this.models; };
+Page.prototype.removeDependencies = function() { /*delete this.models;*/ };
 
 Page.prototype.resolve = function(o) { return o._isLink ? this.models[o[0]][o[1]] : o; };
 
@@ -314,7 +351,25 @@ Page.prototype.nameFor = function(o) {
     if(n) return n;
     var m = this.models[o[0]];
     return m ? m[o[1]].name : null;
-  } else o.name;
+  } else return o.name;
+};
+
+Page.prototype.kindMarkerFor = function(o) {
+  function from(o) {
+    if(!o) return null;
+    if(o.isClass) return "c";
+    if(o.isObject) return "b";
+    if(o.isTrait) return "t";
+    if(o.isPackage) return "p";
+    return null;
+  }
+  if(o._isLink) {
+    if(o[0] == this.no) return from(this.model[o[1]]);
+    var n = ex.global.kinds[o[0]+","+o[1]]
+    if(n) return n;
+    var m = this.models[o[0]];
+    return m ? from(m[o[1]]) : null;
+  } else return from(o);
 };
 
 
@@ -440,6 +495,56 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     return tE;
   }
 
+  function appendSection(name, node, expand, expanded, cls) {
+    var sectCls = "section";
+    if(expanded) sectCls += " visible";
+    if(cls) sectCls += " " + cls;
+    var sectE = e("div", { "class": sectCls }, node);
+    var hdE = e("div", { "class": "sectionhd" }, sectE);
+    t("\u25B6", e("span", { "class": "hidden" }, hdE));
+    t("\u25BC", e("span", { "class": "visible" }, hdE));
+    t(name, hdE);
+    var sectJ = $(sectE);
+    var bodyE = e("div", { "class": "sectionbody" }, sectE);
+    hdE.onclick = function() {
+      sectJ.toggleClass("visible");
+      if(!expanded) {
+        expanded = true;
+        expand(bodyE);
+      }
+    };
+    if(expanded) expand(bodyE);
+  }
+
+  function appendDefSection(name, data, node, expanded) {
+    if(!data || !data.length) return;
+    appendSection(name, node, function(bodyE) {
+      for(var i=0; i<data.length; i++) {
+        var item = that.resolve(data[i]);
+        var itemE = e("div", null, bodyE);
+        t(item.name, itemE);
+      }
+    }, expanded);
+  }
+
+  function appendDiagramSection(name, node, f) {
+    appendSection(name, node, function(bodyE) {
+      var loadingE = e("div", { "class": "loading" }, bodyE);
+      t("Loading diagram...", loadingE);
+      var scripts = $.browser.msie ? ["js/excanvas.js", "js/jit.js", "js/diagrams.js"] : ["js/jit.js", "js/diagrams.js"];
+      loadScripts(scripts, function() {
+        $(loadingE).remove();
+        //var diagParentE = e("div", null, bodyE);
+        var diagJ = $(e("div", { "id": generateID("diagram"), "class": "diagrambody" }, bodyE));
+        //diagJ.css("width", diagJ.attr("clientWidth") + "px");
+        diagJ.css("width", (screen.width-50) + "px");
+        var docE = e("div", { "class": "diagramdoc", title: "Drag diagram to pan, click node to go to template" }, diagJ[0]);
+        t("?", docE);
+        f(diagJ);
+      });
+    }, false, "diagram");
+  }
+
   function createPageDOM(o) {
     var divE = e("div", { "id": "page" });
     // Template signature line
@@ -488,6 +593,16 @@ Page.prototype.createOrGetPageDOM = function(cont) {
       appendDefLine("Subclasses", o.subClasses, defE, { sep: ", " });
       appendDefLine("Linearization", o.linearization, defE, { sep: ", " });
     }
+
+    // Diagram sections
+    if(o.linearization || o.subClasses) {
+      appendDiagramSection("Diagram: Linearization and Subclasses", bodyDivE, function(diagJ) {
+        createClassDiagram(diagJ, that, o);
+      });
+    }
+
+    // Member sections
+    appendDefSection("Methods", o.methods, divE);
 
     that.pageDOM = divE;
     cont(that.pageDOM);
@@ -772,6 +887,9 @@ $(function() {
     inClick = false;
     toggleSidebar();
   });
+  function performSearch(query) {
+    log('TODO: Perform search for "'+query+'"');
+  }
   var searchInput = $("#search"), searchTable = $("#search_area table");
   searchInput.focus(function() {
     searchTable.toggleClass("active", true);
@@ -806,6 +924,9 @@ $(function() {
       case 115: // s
         goToEntity(null, null, "source");
         return false;
+      case 114: // r
+        searchInput.val("");
+        performSearch("");
       default:
         return true;
     }
@@ -818,9 +939,13 @@ $(function() {
   });
   searchInput.keypress(function(e) {
     if(e.keyCode === 13) {
-      log('TODO: Perform search for "'+searchInput.val()+'"');
+      performSearch(searchInput.val());
       return false;
     } else return true;
+  });
+  $("#search_reset").click(function() {
+    searchInput.val("");
+    performSearch("");
   });
 
   function globalReady(global) {

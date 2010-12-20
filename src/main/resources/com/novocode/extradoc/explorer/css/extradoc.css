@@ -616,6 +616,132 @@ code, pre {
   border-radius: 6px;
 }
 
+#page > .section .sectionhd {
+  padding: 6px 18px;
+  margin: 30px 0 12px 0;
+  border-top: 1px solid #c0c0c0;
+  border-bottom: 1px solid #c0c0c0;
+  background-color: #f0f0f0;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #ffffff), color-stop(1, #f0f0f0));
+  background-image: -moz-linear-gradient(center top, #ffffff 0%, #f0f0f0 100%);
+  color: #606060;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#page > .section .sectionhd span {
+  width: 24px;
+  color: #808080;
+}
+
+#page > .section .sectionbody {
+  margin: 12px 18px;
+}
+
+#page .sectionhd span.visible { display: none; }
+#page .sectionhd span.hidden { display: inline-block; }
+#page .section.visible .sectionhd span.visible { display: inline-block; }
+#page .section.visible .sectionhd span.hidden { display: none; }
+#page .section.visible .sectionbody { display: block; }
+#page .sectionbody { display: none; }
+
+#pgbody > .section {
+  margin: 18px 0;
+  border: 1px solid #c0c0c0;
+  -webkit-border-radius: 6px;
+  -moz-border-radius: 6px;
+  border-radius: 6px;
+  box-shadow: 2px 2px 3px #e0e0e0;
+  -moz-box-shadow: 2px 2px 3px #e0e0e0;
+  -webkit-box-shadow: 2px 2px 3px #e0e0e0;
+}
+
+#pgbody > .section .sectionhd {
+  padding: 4px 8px;
+  -webkit-border-radius: 6px;
+  -moz-border-radius: 6px;
+  border-radius: 6px;
+  background-color: #f0f0f0;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #ffffff), color-stop(1, #f0f0f0));
+  background-image: -moz-linear-gradient(center top, #ffffff 0%, #f0f0f0 100%);
+  color: #606060;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: right;
+}
+
+#pgbody > .section.visible .sectionhd {
+  -webkit-border-bottom-right-radius: 0px;
+  -moz-border-radius-bottomright: 0px;
+  border-bottom-right-radius: 0px;
+  -webkit-border-bottom-left-radius: 0px;
+  -moz-border-radius-bottomleft: 0px;
+  border-bottom-left-radius: 0px;
+  border-bottom: 1px solid #c0c0c0;
+}
+
+#pgbody > .section .sectionhd span {
+  width: 24px;
+  color: #808080;
+  float: left;
+  text-align: left;
+}
+
+#pgbody > .section .sectionbody {
+  margin: 6px 8px;
+}
+
+#page .diagram .loading {
+  text-align: center;
+  padding: 18px;
+}
+
+#page .diagram .sectionbody {
+  border: 1px solid #303030;
+  background-color: #303030;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #404040), color-stop(1, #202020));
+  background-image: -moz-linear-gradient(center top, #404040 0%, #202020 100%);
+  margin: 0;
+  overflow: hidden;
+  -webkit-border-bottom-right-radius: 6px;
+  -moz-border-radius-bottomright: 6px;
+  border-bottom-right-radius: 6px;
+  -webkit-border-bottom-left-radius: 6px;
+  -moz-border-radius-bottomleft: 6px;
+}
+
+#page .diagrambody {
+  position: relative;
+  width: 100%;
+  height: 400px;
+  overflow: hidden;
+  -webkit-border-bottom-right-radius: 6px;
+  -moz-border-radius-bottomright: 6px;
+  border-bottom-right-radius: 6px;
+  -webkit-border-bottom-left-radius: 6px;
+  -moz-border-radius-bottomleft: 6px;
+  display: block;
+  color: white;
+  margin: auto;
+}
+
+#page .diagrambody .node, .jit-autoadjust-label {
+  padding: 3px 6px;
+  cursor: pointer;
+  text-align: center;
+}
+
+#page .diagramdoc {
+  font-weight: bold;
+  font-size: 1.2em;
+  z-index: 100;
+  position: absolute;
+  cursor: default;
+  bottom: 6px;
+  left: 10px;
+  color: #ffffa0;
+}
+
 /* Content Area: Model Tab **************************************************/
 
 #content_model > div {

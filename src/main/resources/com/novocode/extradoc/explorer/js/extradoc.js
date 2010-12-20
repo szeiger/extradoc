@@ -137,6 +137,7 @@ function resolveArray(o, name) {
 function resolveGlobal(global) {
   global.pageToPageInfo = [];
   global.qnToPageInfo = {};
+  global.kinds = {};
   function resolveE(e, parentN, parentP) {
     if(!e) return;
     for(var j=0; j<e.length; j++) {
@@ -146,10 +147,12 @@ function resolveGlobal(global) {
       global.qnToPageInfo[n] = pi;
       global.pageToPageInfo[e[j].p] = pi;
       resolveE(e[j].e, n, e[j].p);
+      global.kinds[e[j].p+",0"] = e[j].k;
     }
   }
   for(var i=0; i<global.packages.length; i++) {
     var pck = global.packages[i];
+    global.kinds[pck.p+",0"] = "p";
     var pi = { p: pck.p, "in": pck["in"], qn: pck.n, k: "p" };
     global.qnToPageInfo[pck.n] = pi;
     global.pageToPageInfo[pck.p] = pi;
