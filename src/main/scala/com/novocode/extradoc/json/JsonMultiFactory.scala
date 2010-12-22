@@ -301,6 +301,19 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
         }
       case _ =>
     }
+    def chaseCommentIn(j: JObject, jLink: Option[Link]): Option[Link] = {
+      j("commentIn") match {
+        case Some(l: Link) => chaseCommentIn(allModels(l.target), Some(l))
+        case _ => jLink
+      }
+    }
+    allModels foreach { case (_, j) =>
+      forMembers(j) { (member, _) =>
+        chaseCommentIn(member, None) foreach { l =>
+          member += "commentIn" -> l
+        }
+      }
+    }
     println("Aliased "+count+" comments")
   }
 
