@@ -16,7 +16,7 @@ function View(id) {
 
 new View("none");
 View.currentID = "none";
-View.defaultView = "model";
+View.defaultView = "page";
 
 View.scrollToEntity = function(entity) {
   var view = View[View.currentID];
@@ -112,7 +112,7 @@ function t(t, p) {
 
 function decodeHash(hash) {
   var params = {};
-  if(!hash || hash.charAt(0) != '!') return params;
+  if(!hash) return params;
   var parts = hash.replace(/^!/, "").split("&");
   for(var i=0; i<parts.length; i++) {
     var kv = parts[i].split("=");
@@ -122,10 +122,10 @@ function decodeHash(hash) {
 }
 
 function encodeHash(params) {
-  var hash = "!";
+  var hash = "";
   for(var k in params) {
     if(params.hasOwnProperty(k)) {
-      if(hash.length != 1) hash += "&"
+      if(hash.length) hash += "&"
       hash += encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
     }
   }
@@ -395,40 +395,55 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     });
   }
 
-  function appendFlags(e, node) {
-    if(e.isProtected || !e.isPublic) {
+  function appendFlags(o, node, novis, spanCls) {
+    var _cachedE;
+    function getE() {
+      if(!_cachedE) _cachedE = spanCls ? e("span", { "class": spanCls }, node) : node;
+      return _cachedE;
+    }
+    if(o.isUseCase) t("Use Case: ", getE());
+    if(!novis && (o.isProtected || !o.isPublic)) {
       //--
-      if(!e.visibleIn) {
-        t(e.isProtected ? "protected[this] " : "private[this] ", node);
-      } else if(e.visibleIn.length == 2 && e.inTemplate && e.inTemplate.length == 2) {
-        if(e.visibleIn[0] == e.inTemplate[0] && e.visibleIn[1] == e.inTemplate[1]) {
-          t(e.isProtected ? "protected " : "private ", node);
+      if(!o.visibleIn) {
+        t(o.isProtected ? "protected[this] " : "private[this] ", getE());
+      } else if(o.visibleIn._isLink && o.inTemplate && o.inTemplate._isLink) {
+        if(o.visibleIn[0] == o.inTemplate[0] && o.visibleIn[1] == o.inTemplate[1]) {
+          t(o.isProtected ? "protected " : "private ", getE());
         } else {
-          t(e.isProtected ? "protected[" : "private[");
-          appendLink(e.visibleIn, node);
-          t("]", node);
+          t(o.isProtected ? "protected[" : "private[");
+          appendLink(o.visibleIn, getE());
+          t("]", getE());
         }
       } else {
-        ex.log("Cannot determine visibility for "+e);
-        t(e.isProtected ? "protected[?] " : "private[?] ", node);
+        log("Cannot determine visibility for "+o.name);
+        t(o.isProtected ? "protected[?] " : "private[?] ", getE());
       }
     }
     var s = "";
-    if(e.isImplicit) s += "implicit ";
-    if(e.isSealed) s += "sealed ";
-    if(e.isAbstract) s += "abstract ";
-    if(e.isFinal) s += "final ";
-    if(e.isAliasType || e.isAbstractType) s += "type ";
-    else if(e.isCaseClass) s += "case class ";
-    else if(e.isClass) s += "class ";
-    else if(e.isTrait) s += "trait ";
-    else if(e.isObject) s += "object ";
-    else if(e.isPackage) s += "package ";
-    else if(e.isVar) s += "var ";
-    else if(e.isLazyVal) s += "lazy val ";
-    else if(e.isVal) s += "val ";
-    else if(e.isDef) s += "def ";
-    if(s) t(s, node);
+    if(o.isImplicit) s += "implicit ";
+    if(o.isSealed) s += "sealed ";
+    if(o.isAbstract) s += "abstract ";
+    if(o.isFinal) s += "final ";
+    if(o.isAliasType || o.isAbstractType) s += "type ";
+    else if(o.isCaseClass) s += "case class ";
+    else if(o.isClass) s += "class ";
+    else if(o.isTrait) s += "trait ";
+    else if(o.isObject) s += "object ";
+    else if(o.isPackage) s += "package ";
+    else if(o.isVar) s += "var ";
+    else if(o.isLazyVal) s += "lazy val ";
+    else if(o.isVal) s += "val ";
+    else if(o.isDef) s += "def ";
+    if(s) t(s, getE());
+  }
+
+  function appendTypeParams(tps, node) {
+    t("[", node);
+    for(var i=0; i<tps.length; i++) {
+      if(i != 0) t(", ", node);
+      appendTypeParam(tps[i], node);
+    }
+    t("]", node);
   }
 
   function appendTypeParam(tp, node) {
@@ -447,6 +462,31 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     }
   }
 
+  function appendValueParams(vps, node) {
+    for(var i=0; i<vps.length; i++) {
+      t(i == 0 ? "(" : " (", node);
+      var a = vps[i];
+      for(var j=0; j<a.length; j++) {
+        if(j != 0) t(", ", node);
+        appendValueParam(a[j], node);
+      }
+      t(")", node);
+    }
+  }
+
+  function appendValueParam(vp, node) {
+    if(typeof vp === "string") t(vp, node);
+    else {
+      vp = that.resolve(vp);
+      appendFlags(vp, node, true, "flags");
+      t(vp.name, node);
+      if(vp.resultType) {
+        t(": ", node);
+        appendHTML(vp.resultType, "span", node);
+      }
+    }
+  }
+
   function appendHTML(o, elName, node, params) {
     var cls = params && params.cls;
     if(o._xname) {
@@ -457,18 +497,24 @@ Page.prototype.createOrGetPageDOM = function(cont) {
       var aE = e("a", { href: "#" }, el);
       aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
       t(that.nameFor(o), aE);
+    } else if(typeof o === "string") {
+      t(o, e(elName, { "class" : cls ? "text " + cls : "text" }, node));
     } else {
-      var el = e(elName, { "class": cls ? "html " + cls : "html" }, node);
-      $(el).append(o._html); //TODO Hook up links
+      var el = $(e(elName, { "class": cls ? "html " + cls : "html" }, node));
+      el.append(o._html.trim()); //TODO Hook up links
+      $("pre:empty", el).remove();
+      el.children().first().css("margin-top", 0);
+      el.children().last().css("margin-bottom", 0);
     }
   }
 
   function appendDefLine(name, o, tbl, params) {
-    if(!o) return;
+    if(!o && o !== "") return;
     var sep = params && params.sep;
-    if(typeof o.length === "number" && !o._isLink) {
+    function mkTr() { return e("tr", params && params.cls ? { "class" : params.cls } : null, tbl); }
+    if(typeof o.length === "number" && !o._isLink && typeof o !== "string") {
       if(sep) {
-        var trE = e("tr", null, tbl);
+        var trE = mkTr();
         t(name, e("th", null, trE));
         var tdE = e("td", null, trE);
         for(var i=0; i<o.length; i++) {
@@ -477,36 +523,49 @@ Page.prototype.createOrGetPageDOM = function(cont) {
         }
       } else {
         for(var i=0; i<o.length; i++) {
-          var trE = e("tr", null, tbl);
+          var trE = mkTr();
           if(i == 0) t(name, e("th", { rowspan: o.length }, trE));
           appendHTML(o[i], "td", trE);
         }
       }
     } else {
-      var trE = e("tr", null, tbl);
+      var trE = mkTr();
       t(name, e("th", null, trE));
       appendHTML(o, "td", trE);
     }
   }
 
-  function appendDefTable(name, cls, node) {
-    var tE = e("table", { "class": "deftable " + (cls || ""), cellpadding: 0, cellspacing: 0 }, node);
-    if(name) t(name, e("th", { colspan: 2 }, e("tr", { "class": "head" }, tE)));
-    return tE;
+  function appendDefTable(node, expand, cls) {
+    var tableE = e("table", { "class": cls ? ("deftable "+cls) : "deftable", cellpadding: 0, cellspacing: 0 });
+    expand(tableE);
+    if($(tableE).children().length > 0) {
+      if(node) node.appendChild(tableE);
+      return tableE;
+    }
+    return null;
   }
 
   function appendSection(name, node, expand, expanded, cls) {
+    if(!expand) return null;
+    if(typeof expand !== "function") {
+      var expE = expand;
+      expand = function(sectE) { $(sectE).append(expE); };
+    }
+    if(!name) expanded = true;
     var sectCls = "section";
     if(expanded) sectCls += " visible";
     if(cls) sectCls += " " + cls;
     var sectE = e("div", { "class": sectCls }, node);
-    var hdE = e("div", { "class": "sectionhd" }, sectE);
-    t("\u25B6", e("span", { "class": "hidden" }, hdE));
-    t("\u25BC", e("span", { "class": "visible" }, hdE));
-    t(name, hdE);
     var sectJ = $(sectE);
+    var hdE;
+    if(name) {
+      hdE = e("div", { "class": "sectionhd" }, sectE);
+      t("\u25B6", e("span", { "class": "hidden" }, hdE));
+      t("\u25BC", e("span", { "class": "visible" }, hdE));
+      t(name, hdE);
+    }
     var bodyE = e("div", { "class": "sectionbody" }, sectE);
-    hdE.onclick = function() {
+    if(name) hdE.onclick = function() {
       sectJ.toggleClass("visible");
       if(!expanded) {
         expanded = true;
@@ -514,17 +573,55 @@ Page.prototype.createOrGetPageDOM = function(cont) {
       }
     };
     if(expanded) expand(bodyE);
+    return sectE;
   }
 
-  function appendDefSection(name, data, node, expanded) {
+  function appendMember(o, node) {
+    var nodeJ = $(node);
+    var expanded = false;
+    if(expanded) nodeJ.addClass("expanded");
+    function expand(node) {
+      var longE = e("div", { "class": "long" }, node);
+      if(comment.body || comment.short) appendHTML(comment.body || comment.short, "span", longE);
+      appendParametersSection(o, longE, true);
+    };
+    var hdE = e("div", { "class": "memberhd" }, node);
+    var hE = e("h4", null, hdE);
+    t("\u25B6", e("span", { "class": "hidden" }, hE));
+    t("\u25BC", e("span", { "class": "visible" }, hE));
+    appendFlags(o, hE, null, "flags");
+    t(o.name+" ", e("span", { "class": "etitle" }, hE));
+    if(o.typeParams) {
+      appendTypeParams(o.typeParams, hE);
+      t(" ", hE);
+    }
+    if(o.valueParams) appendValueParams(o.valueParams, hE);
+    if(o.resultType) {
+      t(": ", hE);
+      appendHTML(o.resultType, "span", hE);
+    }
+    var comment = o.comment || (o.commentIn ? that.resolve(o.commentIn).comment : null) || {};
+    var shortE = e("div", { "class": "short" }, hdE);
+    if(comment.short) appendHTML(comment.short, "span", shortE);
+    hdE.onclick = function() {
+      nodeJ.toggleClass("expanded");
+      if(!expanded) {
+        expanded = true;
+        expand(node);
+      }
+    };
+    if(expanded) expand(node);
+  }
+
+  function appendMemberSection(name, data, node, expanded) {
     if(!data || !data.length) return;
     appendSection(name, node, function(bodyE) {
       for(var i=0; i<data.length; i++) {
         var item = that.resolve(data[i]);
-        var itemE = e("div", null, bodyE);
-        t(item.name, itemE);
+        var itemE = e("div", i%2 ? { "class": "odd" } : null, bodyE);
+        appendMember(item, itemE);
       }
-    }, expanded);
+    }, expanded, "defs");
   }
 
   function appendDiagramSection(name, node, f) {
@@ -545,20 +642,43 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     }, false, "diagram");
   }
 
+  function appendParametersSection(o, node, all) {
+    if(!o) return;
+    function f(a, cls, tbE) {
+      for(var i=0; i<a.length; i++) {
+        var p = that.resolve(a[i]);
+        if(typeof p === "string") {
+          if(all) appendDefLine(p, "", tbE, { cls: cls });
+        } else if(p.doc || all) {
+          appendDefLine(p.name, p.doc || "", tbE, { cls: cls });
+        }
+      }
+    }
+    appendDefTable(node, function(tbE) {
+      if(o.typeParams) f(o.typeParams, "t", tbE);
+      if(o.valueParams) {
+        for(var i=0; i<o.valueParams.length; i++)
+          f(o.valueParams[i], "v", tbE);
+      }
+      var comment = o.comment || (o.commentIn ? that.resolve(o.commentIn).comment : null);
+      if(comment) {
+        if(comment.result) appendDefLine("Result", comment.result, tbE);
+        if(comment.example)
+          for(var i=0; i<comment.example.length; i++) appendDefLine("Example", comment.example[i], tbE);
+        if(comment.see)
+          for(var i=0; i<comment.see.length; i++) appendDefLine("See", comment.see[i], tbE);
+      }
+    }, "params");
+  }
+
   function createPageDOM(o) {
     var divE = e("div", { "id": "page" });
+    var comment = o.comment || (o.commentIn ? that.resolve(o.commentIn).comment : null) || {};
     // Template signature line
     var titleDivE = e("div", { "id": "pgtitle" }, divE);
     appendFlags(o, titleDivE);
     t(o.name, e("span", { "class": "etitle" }, titleDivE));
-    if(o.typeParams) {
-      t("[", titleDivE);
-      for(var i=0; i<o.typeParams.length; i++) {
-        if(i != 0) t(", ", titleDivE);
-        appendTypeParam(o.typeParams[i], titleDivE);
-      }
-      t("]", titleDivE);
-    }
+    if(o.typeParams) appendTypeParams(o.typeParams, titleDivE);
     if(o.parentType) {
       var extE = e("span", { "class": "extends" }, titleDivE);
       t(" extends ", extE);
@@ -566,33 +686,22 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     }
     var bodyDivE = e("div", { "id": "pgbody" }, divE);
     // Main doc comment
-    var doc = o.comment ? (o.comment.body || o.comment["short"]) : null;
+    var doc = comment ? (comment.body || comment["short"]) : null;
     if(doc) appendHTML(doc, "div", bodyDivE);
-    // Type parameter docs
-    if(o.typeParams) {
-      var defE = appendDefTable("Type Parameters", "tparams");
-      var numTPs = 0;
-      for(var i=0; i<o.typeParams.length; i++) {
-        var tp = that.resolve(o.typeParams[i]);
-        if((typeof tp !== "string") && tp.doc) {
-          appendDefLine(tp.name, tp.doc, defE);
-          numTPs++;
-        }
+    // Type parameters
+    appendParametersSection(o, bodyDivE);
+    // Attributes
+    appendSection(null, bodyDivE, appendDefTable(null, function(tbE) {
+      if(comment) {
+        appendDefLine("Version", comment.version, tbE);
+        appendDefLine("Since", comment.since, tbE);
+        if(comment.authors)
+          appendDefLine(comment.authors.length == 1 ? "Author" : "Authors", comment.authors, tbE);
       }
-      if(numTPs > 0) bodyDivE.appendChild(defE);
-    }
-    if((o.comment && (o.comment.version || o.comment.since || o.comment.authors)) || o.companion || o.linearization || o.subClasses) {
-      var defE = appendDefTable(null, "tags", bodyDivE);
-      if(o.comment) {
-        appendDefLine("Version", o.comment.version, defE);
-        appendDefLine("Since", o.comment.since, defE);
-        if(o.comment.authors)
-          appendDefLine(o.comment.authors.length == 1 ? "Author" : "Authors", o.comment.authors, defE);
-      }
-      appendDefLine("Companion", o.companion, defE);
-      appendDefLine("Subclasses", o.subClasses, defE, { sep: ", " });
-      appendDefLine("Linearization", o.linearization, defE, { sep: ", " });
-    }
+      appendDefLine("Companion", o.companion, tbE);
+      appendDefLine("Subclasses", o.subClasses, tbE, { sep: ", " });
+      appendDefLine("Linearization", o.linearization, tbE, { sep: ", " });
+    }));
 
     // Diagram sections
     if(o.linearization || o.subClasses) {
@@ -602,7 +711,7 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     }
 
     // Member sections
-    appendDefSection("Methods", o.methods, divE);
+    appendMemberSection("Methods", o.methods, divE, true);
 
     that.pageDOM = divE;
     cont(that.pageDOM);
@@ -688,7 +797,10 @@ Page.prototype.createOrGetModelDOM = function(cont) {
     }
     else if(o.hasOwnProperty("_html")) {
       var divE = e("div", { "class": "html" });
-      $(divE).append(o._html);
+      var divJ = $(divE);
+      divJ.append(o._html);
+      divJ.children().first().css("margin-top", 0);
+      divJ.children().last().css("margin-bottom", 0);
       //TODO Hook up links
       return divE;
     }
