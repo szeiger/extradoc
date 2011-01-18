@@ -55,7 +55,14 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
           par !! "isTemplate" || par("is", "").contains('M')
         } getOrElse false
         def isInParent = parent collect { case par: JObject =>
-          (par("values", JArray.Empty).values ++ par("methods", JArray.Empty).values) contains Link(ord)
+          /*val valuesAndMethods = par("members", JArray.Empty).values filter {
+            case Link(t) =>
+              val tt = allModels(t)
+              val ttIs = tt("is", "")
+              tt !! "isVal" || tt !! "isMethod" || ttIs.contains("") || ttIs.contains("")
+            case _ => false
+          }*/
+          par("members", JArray.Empty).values contains Link(ord)
         } getOrElse false
         val companionPage = j("companion") map { case l: Link => pages get l.target }
         // Don't map external packages to their parents
@@ -209,12 +216,13 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
     println("Writing global.json")
     val processedTemplates = new mutable.HashSet[Int]
     def processTemplates(jOrd: Int, j: JObject, jo: JObject) {
-      j("templates") foreach { case a: JArray =>
+      j("members") foreach { case a: JArray =>
         val children = a.values collect { case l: Link =>
           (l.target, allModels(l.target))
         } filter { case (_, j: JObject) =>
           val up = j("inTemplate") collect { case l: Link => l.target } getOrElse -1
-          up == -1 || up == jOrd
+          val isTemplate = j !! "isTemplate" || j("is", "").contains('M')
+          isTemplate && (up == -1 || up == jOrd)
         }
         val tlChildren = children map { case (ord, j: JObject) =>
           val is = j("is", "")
@@ -261,7 +269,7 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
   def aliasComments(allModels: mutable.HashMap[Int, JObject]) {
     println("Aliasing repeated comments")
     def forMembers(j: JObject)(f: (JObject, Link) => Unit) {
-      j("values", JArray.Empty).values ++ j("methods", JArray.Empty).values foreach {
+      j("members", JArray.Empty).values foreach {
         case l: Link => f(allModels(l.target), l)
         case _ =>
       }

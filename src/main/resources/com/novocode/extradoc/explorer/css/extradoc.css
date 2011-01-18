@@ -544,6 +544,65 @@ code, pre {
 
 #pgtitle .extends { color: #8080a0; }
 
+#pgtitle .companion_switch {
+  float: right;
+  padding-left: 48px;
+}
+
+#pgtitle .switch {
+  font-size: 12px;
+  line-height: 12px;
+  font-weight: normal;
+  border: 1px solid #9cadc0;
+  background: #cad3da;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #b8c2ca), color-stop(0.95, #edf4fb), color-stop(1, #f1f9ff));
+  background-image: -moz-linear-gradient(center bottom, #b8c2ca 0%, #edf4fb 95%, #f1f9ff 100%);
+  color: #42505c;
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  border-radius: 10px;
+  padding: 1px 0;
+}
+
+#pgtitle .switch > * {
+  padding: 1px 12px;
+  cursor: pointer;
+}
+
+#pgtitle .switch > .left {
+  border-right: 1px solid #9cadc0;
+  -webkit-border-top-left-radius: 10px;
+  -moz-border-radius-topleft: 10px;
+  border-top-left-radius: 10px;
+  -webkit-border-bottom-left-radius: 10px;
+  -moz-border-radius-bottomleft: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+#pgtitle .switch > .right {
+  -webkit-border-top-right-radius: 10px;
+  -moz-border-radius-topright: 10px;
+  border-top-right-radius: 10px;
+  -webkit-border-bottom-right-radius: 10px;
+  -moz-border-radius-bottomright: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+#pgtitle .switch > *:hover {
+  color: black;
+  background: #dae3ea;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #c8d2da), color-stop(0.95, #fdffff), color-stop(1, #ffffff));
+  background-image: -moz-linear-gradient(center bottom, #c8d2da 0%, #fdffff 95%, #ffffff 100%);
+}
+
+#pgtitle .switch > .selected {
+  color: black;
+  background: #edf1f5;
+  background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #edf1f5), color-stop(0.95, #ccd2d7), color-stop(1, #b8bdc1));
+  background-image: -moz-linear-gradient(center bottom, #edf1f5 0%, #ccd2d7 95%, #b8bdc1 100%);
+  cursor: default;
+}
+
 #pgbody {
   margin: 12px 18px;
 }
@@ -735,12 +794,11 @@ code, pre {
 #page .defs .sectionbody > div {
   padding: 0 12px;
   margin: 0 6px;
+  border-top: 1px solid #e0e0e0;
 }
 
-#page .defs .sectionbody > div.odd {
-  background-color: #fcfcfc;
-  border-top: 1px solid #e0e0e0;
-  border-bottom: 1px solid #e0e0e0;
+#page .defs .sectionbody > div.first {
+  border-top: 0px;
 }
 
 #page .memberhd {
@@ -758,8 +816,9 @@ code, pre {
 }
 
 #page .memberhd .short {
-  margin: 0;
+  margin: 0 0 0 18px;
   padding-bottom: 6px;
+  color: #505050;
 }
 
 #page .long {

@@ -153,10 +153,13 @@ abstract class AbstractJsonFactory(val universe: Universe) { self =>
     val global = new mutable.HashSet[Int]
     def f(ord: Int) {
       if(!(global contains ord)) {
-        global += ord
         val j = allModels(ord)
-        j("templates", JArray.Empty).values foreach { v =>
-          f(v.asInstanceOf[Link].target)
+        if(j !! "isTemplate" || j("is", "").contains('M')) {
+          global += ord
+          j("members", JArray.Empty).values foreach {
+            case Link(target) => f(target)
+            case _ =>
+          }
         }
       }
     }

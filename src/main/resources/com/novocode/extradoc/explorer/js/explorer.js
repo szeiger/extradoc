@@ -342,7 +342,11 @@ Page.prototype.loadDependencies = function(cont) {
 
 Page.prototype.removeDependencies = function() { /*delete this.models;*/ };
 
-Page.prototype.resolve = function(o) { return o._isLink ? this.models[o[0]][o[1]] : o; };
+Page.prototype.resolve = function(o) {
+  if(!o._isLink) return o;
+  var a = this.models[o[0]];
+  return a && a[o[1]] || o;
+};
 
 Page.prototype.nameFor = function(o) {
   if(o._isLink) {
@@ -495,7 +499,7 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     } else if(o._isLink) {
       var el = e(elName, { "class": cls ? "link " + cls : "link" }, node);
       var aE = e("a", { href: "#" }, el);
-      aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
+      aE.onclick = function() { goToEntity(o[0], o[1]); return false; };
       t(that.nameFor(o), aE);
     } else if(typeof o === "string") {
       t(o, e(elName, { "class" : cls ? "text " + cls : "text" }, node));
@@ -583,7 +587,7 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     function expand(node) {
       var longE = e("div", { "class": "long" }, node);
       if(comment.body || comment.short) appendHTML(comment.body || comment.short, "span", longE);
-      appendParametersSection(o, longE, true);
+      appendParametersSection(o, longE);
     };
     var hdE = e("div", { "class": "memberhd" }, node);
     var hE = e("h4", null, hdE);
@@ -618,7 +622,7 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     appendSection(name, node, function(bodyE) {
       for(var i=0; i<data.length; i++) {
         var item = that.resolve(data[i]);
-        var itemE = e("div", i%2 ? { "class": "odd" } : null, bodyE);
+        var itemE = e("div", i == 0 ? { "class": "first" } : null, bodyE);
         appendMember(item, itemE);
       }
     }, expanded, "defs");
@@ -676,6 +680,17 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     var comment = o.comment || (o.commentIn ? that.resolve(o.commentIn).comment : null) || {};
     // Template signature line
     var titleDivE = e("div", { "id": "pgtitle" }, divE);
+    if(o.companion) {
+      var leftKind = o.isObject ? (that.kindMarkerFor(o.companion) == "t" ? "trait" : "class") : o.isTrait ? "trait" : "class";
+      var switchE = e("span", { "class": "switch" }, e("span", { "class": "companion_switch" }, titleDivE));
+      var leftE = e("span", { "class" : o.isObject ? "left" : "left selected" }, switchE);
+      t(leftKind, leftE);
+      var rightE = e("span", { "class" : o.isObject ? "right selected" : "right" }, switchE);
+      t("object", rightE);
+      var companionE = o.isObject ? leftE : rightE;
+      companionE.title = "Go to companion " + (o.isObject ? leftKind : "object") + " " + o.qName;
+      companionE.onclick = function() { goToEntity(o.companion[0], o.companion[1]); return false; };
+    }
     appendFlags(o, titleDivE);
     t(o.name, e("span", { "class": "etitle" }, titleDivE));
     if(o.typeParams) appendTypeParams(o.typeParams, titleDivE);
@@ -684,6 +699,7 @@ Page.prototype.createOrGetPageDOM = function(cont) {
       t(" extends ", extE);
       appendXName(o.parentType, extE);
     }
+    t(" ", titleDivE);
     var bodyDivE = e("div", { "id": "pgbody" }, divE);
     // Main doc comment
     var doc = comment ? (comment.body || comment["short"]) : null;
@@ -698,20 +714,20 @@ Page.prototype.createOrGetPageDOM = function(cont) {
         if(comment.authors)
           appendDefLine(comment.authors.length == 1 ? "Author" : "Authors", comment.authors, tbE);
       }
-      appendDefLine("Companion", o.companion, tbE);
-      appendDefLine("Subclasses", o.subClasses, tbE, { sep: ", " });
+      //appendDefLine("Companion", o.companion, tbE);
+      appendDefLine("Subtypes", o.subClasses, tbE, { sep: ", " });
       appendDefLine("Linearization", o.linearization, tbE, { sep: ", " });
     }));
 
     // Diagram sections
     if(o.linearization || o.subClasses) {
-      appendDiagramSection("Diagram: Linearization and Subclasses", bodyDivE, function(diagJ) {
+      appendDiagramSection("Diagram: Linearization and Subtypes", bodyDivE, function(diagJ) {
         createClassDiagram(diagJ, that, o);
       });
     }
 
     // Member sections
-    appendMemberSection("Methods", o.methods, divE, true);
+    appendMemberSection("Members", o.members, divE, true);
 
     that.pageDOM = divE;
     cont(that.pageDOM);
@@ -779,7 +795,7 @@ Page.prototype.createOrGetModelDOM = function(cont) {
     else if(o._isLink) {
       var spanE = e("span");
       var aE = e("a", { href: "#" }, spanE);
-      aE.onclick = function() { goToEntity(o[0], o[1]); return false; }
+      aE.onclick = function() { goToEntity(o[0], o[1]); return false; };
       t(that.nameFor(o), aE);
       t((o[0] == that.no ? "\u2192 " : "\u2197 ")+o[0]+", "+o[1], e("span", { "class": "entityno" }, spanE));
       return spanE;

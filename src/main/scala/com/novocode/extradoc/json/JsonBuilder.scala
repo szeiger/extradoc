@@ -226,30 +226,25 @@ abstract class JsonBuilder[Link : CanBeValue] {
       j +?= "linearization" -> JArray(t.linearization.map(e => global(e)(createEntity _)))
       j +?= "subClasses" -> JArray(t.subClasses.map(e => global(e)(createEntity _)))
       // "members" is constructors + templates + methods + values + abstractTypes + aliasTypes + packages
-      //j +?= "members" -> JArray(t.members.map(e => global(e)(createEntity _)))
-      j +?= "templates" -> JArray(t.templates.map(e => global(e)(createEntity _)))
-      j +?= "methods" -> JArray(t.methods.map(e => global(e)(createEntity _)))
-      j +?= "values" -> JArray(t.values.map(e => global(e)(createEntity _)))
-      j +?= "abstractTypes" -> JArray(t.abstractTypes.map(e => global(e)(createEntity _)))
-      j +?= "aliasTypes" -> JArray(t.aliasTypes.map(e => global(e)(createEntity _)))
+      j +?= "members" -> JArray(t.members.map(e => global(e)(createEntity _)))
+      //j +?= "templates" -> JArray(t.templates.map(e => global(e)(createEntity _)))
+      //j +?= "methods" -> JArray(t.methods.map(e => global(e)(createEntity _)))
+      //j +?= "values" -> JArray(t.values.map(e => global(e)(createEntity _)))
+      //j +?= "abstractTypes" -> JArray(t.abstractTypes.map(e => global(e)(createEntity _)))
+      //j +?= "aliasTypes" -> JArray(t.aliasTypes.map(e => global(e)(createEntity _)))
       t.companion foreach { p => j += "companion" -> global(p)(createEntity _) }
     }
     as[Trait](e) { t =>
       j +?= "valueParams" -> createValueParams(t.valueParams, vParams)
     }
     as[Class](e) { c =>
-      val (pcons, ocons) = c.constructors partition { _.isPrimary }
-      val cons = pcons ++ ocons
-      // primaryConstructor is the first constructor if it has isPrimary = true,
-      // otherwise the primary constructor is private (and thus missing from the model)
-      //c.primaryConstructor foreach { c => j += "primaryConstructor" -> global(c)(createEntity _) }
-      j +?= "constructors" -> JArray(cons.map(e => global(e)(createEntity _)))
+      //j +?= "constructors" -> JArray(c.constructors.map(e => global(e)(createEntity _)))
       if(c.isCaseClass) {
         if(compactFlags) set(j, 'C')
         else j += "isCaseClass" -> true
       }
     }
-    as[Package](e) { p => j +?= "packages" -> JArray(p.packages.map(e => global(e)(createEntity _))) }
+    //as[Package](e) { p => j +?= "packages" -> JArray(p.packages.map(e => global(e)(createEntity _))) }
     as[NonTemplateMemberEntity](e) { n =>
       if(n.isUseCase) {
         if(compactFlags) set(j, 'U')
