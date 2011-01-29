@@ -18,7 +18,9 @@ the command line syntax) of the original Scaladoc, plus:
 Usage: There's a bin/extradoc.bat script for Windows that can be used after
 building the project with "sbt compile". Make sure that the "scala" command
 from Scala 2.8.0 is on your path. Or run the main class
-com.novocode.extradoc.ExtraDoc in some other way.
+com.novocode.extradoc.ExtraDoc in some other way. Note the current version of
+Extradoc requires Scala 2.8.0. It will *not* work with otherwise API-compatible
+versions like 2.8.1 because it relies on internal compiler code.
 
 Example: Building scaladoc.json for the Scala library (run from the base dir
 of the Scala source code; put everything on one line):

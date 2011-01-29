@@ -603,6 +603,34 @@ code, pre {
   cursor: default;
 }
 
+#page .compact_deftable {
+  padding-left: 18px;
+  text-indent: -4px;
+}
+
+#page .compact_deftable em {
+  font-weight: bold;
+  font-style: normal;
+  color: #606060;
+  margin-left: 4px;
+}
+
+#page .compact_deftable .arrow, #page .deftable th .arrow {
+  color: #c0c0c0;
+  float: left;
+  text-align: left;
+  cursor: pointer;
+}
+
+#page .compact_deftable .arrow {
+  text-indent: -18px;
+}
+
+#page .compact_deftable .arrow:hover, #page .deftable th .arrow:hover {
+  text-shadow: #d0d0d0 2px 2px 2px;
+  color: #606060;
+}
+
 #pgbody {
   margin: 12px 18px;
 }
@@ -618,9 +646,9 @@ code, pre {
   vertical-align: top;
   text-align: right;
   color: #606060;
-  background-color: #f8f8f8;
-  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #f6f6f6), color-stop(1, #fdfdfd));
-  background-image: -moz-linear-gradient(center top, #f6f6f6 0%, #fdfdfd 100%);
+  background-color: #f3f3f3;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #f2f2f2), color-stop(1, #fafafa));
+  background-image: -moz-linear-gradient(center top, #f2f2f2 0%, #fafafa 100%);
   -webkit-border-bottom-left-radius: 6px;
   -moz-border-radius-bottomleft: 6px;
   border-bottom-left-radius: 6px;
@@ -644,15 +672,15 @@ code, pre {
 }
 
 #page .deftable.params tr.t th {
-  background-color: #f2f5f9;
-  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #eaeef4), color-stop(1, #f5f8fc));
-  background-image: -moz-linear-gradient(center top, #eaeef2 0%, #f5f8fc 100%);
+  background-color: #edf0fa;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #e4ebf8), color-stop(1, #f4faff));
+  background-image: -moz-linear-gradient(center top, #e4ebf8 0%, #f4faff 100%);
 }
 
 #page .deftable.params tr.v th {
-  background-color: #f2f9f5;
-  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #eaf4ee), color-stop(1, #f5fcf8));
-  background-image: -moz-linear-gradient(center top, #eaf2ee 0%, #f5fcf8 100%);
+  background-color: #edfaf0;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #e4f8eb), color-stop(1, #f4fffa));
+  background-image: -moz-linear-gradient(center top, #e4f8eb 0%, #f4fffa 100%);
 }
 
 #page pre {

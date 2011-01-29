@@ -505,10 +505,15 @@ Page.prototype.createOrGetPageDOM = function(cont) {
       t(o, e(elName, { "class" : cls ? "text " + cls : "text" }, node));
     } else {
       var el = $(e(elName, { "class": cls ? "html " + cls : "html" }, node));
-      el.append(o._html.trim()); //TODO Hook up links
-      $("pre:empty", el).remove();
-      el.children().first().css("margin-top", 0);
-      el.children().last().css("margin-bottom", 0);
+      var html = $.trim(o._html);
+      if(params && params.compact && html.indexOf("<p") == 0) {
+        el.append($(html).html()+"..");
+      } else {
+        el.append(html); //TODO Hook up links
+        $("pre:empty", el).remove();
+        el.children().first().css("margin-top", 0);
+        el.children().last().css("margin-bottom", 0);
+      }
     }
   }
 
@@ -675,6 +680,45 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     }, "params");
   }
 
+  function appendExpandableDefTable(node, expand, expanded) {
+    // (HTMLElement, ((String, Object, Object) -> Unit, Boolean -> Unit), Boolean) -> Unit
+    var attrE = e("p", { "class": "compact_deftable" });
+    var attrExpandE = e("span", { "class": "arrow" }, attrE);
+    t("\u25B6", attrExpandE);
+    var hasAttr = false;
+    expand(function(n, a) {
+      if(!a) return;
+      if(!hasAttr) hasAttr = true;
+      else t(". ", attrE);
+      t(n+": ", e("em", null, attrE));
+      if(typeof a.length === "number" && !a._isLink && typeof a !== "string") {
+        for(var i=0; i<a.length; i++) {
+          if(i !== 0) t(", ", attrE);
+          appendHTML(a[i], "span", attrE, { compact: true });
+        }
+      }
+      else appendHTML(a, "span", attrE, { compact: true });
+    }, true);
+    if(hasAttr) node.appendChild(attrE);
+    else expanded = true;
+    var tblE = appendDefTable(node, function(tbE) {
+      expand(function(n, o, params) { appendDefLine(n, o, tbE, params); }, false);
+    });
+    if(hasAttr) {
+      var tblContractE = e("span", { "class": "arrow" });
+      t("\u25BC", tblContractE);
+      $("th:first", tblE).prepend(tblContractE);
+      var attrJ = $(attrE), tblJ = $(tblE);
+      function showHide(e) {
+        attrJ.css("display", e ? "none" : "block");
+        tblJ.css("display", e ? "block" : "none");
+      }
+      attrExpandE.onclick = function() { showHide(true); };
+      tblContractE.onclick = function() { showHide(false); };
+      showHide(expanded);
+    }
+  }
+
   function createPageDOM(o) {
     var divE = e("div", { "id": "page" });
     var comment = o.comment || (o.commentIn ? that.resolve(o.commentIn).comment : null) || {};
@@ -707,17 +751,16 @@ Page.prototype.createOrGetPageDOM = function(cont) {
     // Type parameters
     appendParametersSection(o, bodyDivE);
     // Attributes
-    appendSection(null, bodyDivE, appendDefTable(null, function(tbE) {
+    appendExpandableDefTable(bodyDivE, function(f, compact) {
       if(comment) {
-        appendDefLine("Version", comment.version, tbE);
-        appendDefLine("Since", comment.since, tbE);
+        f("Version", comment.version);
+        f("Since", comment.since);
         if(comment.authors)
-          appendDefLine(comment.authors.length == 1 ? "Author" : "Authors", comment.authors, tbE);
+          f(comment.authors.length == 1 ? "Author" : "Authors", comment.authors);
       }
-      //appendDefLine("Companion", o.companion, tbE);
-      appendDefLine("Subtypes", o.subClasses, tbE, { sep: ", " });
-      appendDefLine("Linearization", o.linearization, tbE, { sep: ", " });
-    }));
+      f("Subtypes", o.subClasses, { sep: ", " });
+      if(!compact) f("Linearization", o.linearization, { sep: ", " });
+    });
 
     // Diagram sections
     if(o.linearization || o.subClasses) {
