@@ -46,4 +46,7 @@ already exists; put everything on one line):
     src\actors src\library\scala src\swing src\continuations\library
 
 See LICENSE.txt for licensing conditions (BSD-style). Dependencies have their
-own licenses (BSD or MIT).
+own licenses (BSD, MIT, Apache, Scla). Patches are gladly accepted from their
+original author. Along with any patches, please state that the patch is your
+original work and that you license the work to the Extradoc project under the
+project's open source license.

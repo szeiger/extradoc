@@ -29,8 +29,11 @@ class JsonMultiFactory(universe: Universe, explorer: Boolean = false) extends Ab
       val p = "/com/novocode/extradoc/explorer"
       copyResource(p, "index.html")
       copyResource(p, "css/extradoc.css")
+      copyResource(p, "js/cache.js")
+      copyResource(p, "js/diagrams.js")
       copyResource(p, "js/extradoc.js")
       copyResource(p, "js/explorer.js")
+      copyResource(p, "js/jit.js")
       copyResource(p, "js/jquery-1.4.2.min.js")
       copyResource(p, "js/jquery-ui-1.8.5.custom.min.js")
       copyResource(p, "js/jquery.history.js")
