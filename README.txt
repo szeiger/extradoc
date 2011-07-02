@@ -50,3 +50,7 @@ own licenses (BSD, MIT, Apache, Scla). Patches are gladly accepted from their
 original author. Along with any patches, please state that the patch is your
 original work and that you license the work to the Extradoc project under the
 project's open source license.
+
+The current release is Extradoc 0.1 for Scala 2.8.0. Binaries can be found at
+http://scala-tools.org/repo-releases/com/novocode/extradoc_2.8.0/0.1/ or
+referenced with Maven/Ivy.
